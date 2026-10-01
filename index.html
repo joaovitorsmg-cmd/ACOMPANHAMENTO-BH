@@ -85,13 +85,17 @@ body {
   box-shadow: 0 2px 8px rgba(0,0,0,.2);
 }
 .header-logo {
-  font-size: 20px;
-  font-weight: 800;
-  letter-spacing: -0.5px;
-  color: #fff;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
 }
-.header-logo span { color: #64b5f6; }
+.header-logo img {
+  height: 38px;
+  background: #fff;
+  padding: 4px 10px;
+  border-radius: 7px;
+  display: block;
+}
 .header-title {
   font-size: 13px;
   font-weight: 500;
@@ -477,7 +481,7 @@ textarea:focus { border-color: var(--accent); }
 
 <!-- HEADER -->
 <header class="header">
-  <div class="header-logo">AGRO<span>QUIMA</span></div>
+  <div class="header-logo"><img src="assets/logo.png" alt="Agroquima"></div>
   <div class="header-title">Painel · Banco de Horas</div>
   <div class="header-period" id="header-period" style="display:none">—</div>
   <div class="header-actions">
