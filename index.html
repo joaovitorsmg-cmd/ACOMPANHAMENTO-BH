@@ -590,12 +590,12 @@ body:not(.presentation) .ps-shortcut-bar { display: none; }
 <!-- UPLOAD SCREEN -->
 <div id="upload-screen">
   <div class="upload-card" id="drop-zone">
-    <div class="upload-icon">📊</div>
-    <h2>Conta Corrente Banco de Horas</h2>
-    <p>Arraste e solte o arquivo .xlsx aqui, ou clique para selecionar.<br>Os dados ficam salvos localmente nesta máquina.</p>
-    <button class="btn-upload" onclick="document.getElementById('file-input').click()">
-      📂 Selecionar arquivo .xlsx
-    </button>
+    <label for="file-input" style="display:block;cursor:pointer">
+      <div class="upload-icon">📊</div>
+      <h2>Conta Corrente Banco de Horas</h2>
+      <p>Arraste e solte o arquivo .xlsx aqui, ou clique em qualquer lugar para selecionar.<br>Os dados ficam salvos localmente nesta máquina.</p>
+      <span class="btn-upload">📂 Selecionar arquivo .xlsx</span>
+    </label>
     <input type="file" id="file-input" accept=".xlsx,.xls" onchange="handleFile(this.files[0])">
     <div class="upload-hint">Arquivo: Relatorio_ContaCorrenteBancoDeHorasResumo_*.xlsx</div>
   </div>
