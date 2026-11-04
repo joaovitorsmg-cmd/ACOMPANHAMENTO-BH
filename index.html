@@ -6,6 +6,7 @@
 <title>Banco de Horas — Agroquima</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
 <style>
 :root {
   --bg: #f0f2f5;
@@ -469,6 +470,41 @@ textarea:focus { border-color: var(--accent); }
 }
 .section-title span { font-size: 12px; font-weight: 400; color: var(--text2); }
 
+/* ── SYNC INDICATOR ── */
+.sync-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: rgba(255,255,255,.4);
+  display: inline-block;
+  margin-right: 2px;
+  transition: background .3s;
+}
+.sync-dot.ok { background: #69f0ae; }
+.sync-dot.err { background: #ff5252; }
+.sync-dot.loading { background: #ffd740; animation: pulse .8s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+/* ── MODO APRESENTAÇÃO ── */
+body.presentation .warning-banner { display: none !important; }
+body.presentation .filter-bar { display: none !important; }
+body.presentation #sup-section { display: none !important; }
+body.presentation .kpi-value { font-size: 52px !important; }
+body.presentation .kpi-card { padding: 20px 18px !important; }
+body.presentation .kpi-row { margin-bottom: 20px !important; }
+body.presentation td, body.presentation th { font-size: 13px !important; padding: 10px 12px !important; }
+body.presentation .table-title { font-size: 15px !important; }
+.presentation-banner {
+  display: none;
+  background: var(--accent);
+  color: #fff;
+  text-align: center;
+  padding: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+body.presentation .presentation-banner { display: block; }
+
 /* ── RESPONSIVE ── */
 @media (max-width: 700px) {
   .kpi-row { grid-template-columns: repeat(2, 1fr); }
@@ -485,10 +521,14 @@ textarea:focus { border-color: var(--accent); }
   <div class="header-title">Painel · Banco de Horas</div>
   <div class="header-period" id="header-period" style="display:none">—</div>
   <div class="header-actions">
+    <span class="sync-dot" id="sync-dot" title="Sincronização Supabase"></span>
+    <button class="btn-icon" id="btn-presentation" onclick="togglePresentation()" title="Modo Apresentação">📊 Apresentação</button>
     <button class="btn-icon" onclick="toggleTheme()" title="Alternar tema">🌓</button>
     <button class="btn-icon btn-danger" id="btn-reset" style="display:none" onclick="confirmReset()">🔄 Atualizar Base</button>
   </div>
 </header>
+
+<div class="presentation-banner">▶ MODO APRESENTAÇÃO — pressione ESC para sair</div>
 
 <!-- WARNING BANNER -->
 <div class="warning-banner">
@@ -662,6 +702,85 @@ textarea:focus { border-color: var(--accent); }
 
 <script>
 // ══════════════════════════════════════════════
+//  SUPABASE
+// ══════════════════════════════════════════════
+const SB_URL = 'https://yeburvkopwbmnfcmthtz.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InllYnVydmtvcHdibW5mY210aHR6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3NzYwMzMsImV4cCI6MjA5NTM1MjAzM30.3t-4Q8SM9XV0OdQLHktMUmKNItg1byBkyv0HGN3B-74';
+let sb = null;
+
+function initSupabase() {
+  try {
+    sb = supabase.createClient(SB_URL, SB_KEY);
+    setSyncDot('ok');
+  } catch(e) { setSyncDot('err'); }
+}
+
+function setSyncDot(state) {
+  const d = document.getElementById('sync-dot');
+  if (d) { d.className = 'sync-dot ' + state; }
+}
+
+async function loadObsSupabase(periodo) {
+  if (!sb || !periodo) return;
+  setSyncDot('loading');
+  try {
+    const { data, error } = await sb.from('banco_horas_obs')
+      .select('matricula,periodo,texto,auditor')
+      .eq('periodo', periodo);
+    if (error) throw error;
+    if (data && data.length) {
+      data.forEach(row => {
+        localStorage.setItem('aq_obs_'+row.matricula, JSON.stringify({
+          text: row.texto,
+          date: new Date().toLocaleDateString('pt-BR'),
+          semana: row.periodo,
+          auditor: row.auditor
+        }));
+      });
+    }
+    setSyncDot('ok');
+    return data || [];
+  } catch(e) { setSyncDot('err'); return []; }
+}
+
+async function upsertObsSupabase(matricula, periodo, texto, auditor) {
+  if (!sb) return;
+  setSyncDot('loading');
+  try {
+    const { error } = await sb.from('banco_horas_obs')
+      .upsert({ matricula, periodo, texto, auditor: auditor||'' },
+               { onConflict: 'matricula,periodo' });
+    if (error) throw error;
+    setSyncDot('ok');
+  } catch(e) { setSyncDot('err'); }
+}
+
+async function deleteObsSupabase(matricula, periodo) {
+  if (!sb) return;
+  try {
+    await sb.from('banco_horas_obs')
+      .delete()
+      .match({ matricula, periodo });
+  } catch(e) {}
+}
+
+// ══════════════════════════════════════════════
+//  MODO APRESENTAÇÃO
+// ══════════════════════════════════════════════
+function togglePresentation() {
+  const on = document.body.classList.toggle('presentation');
+  document.getElementById('btn-presentation').textContent = on ? '✖ Sair' : '📊 Apresentação';
+  if (on) document.documentElement.requestFullscreen?.().catch(()=>{});
+  else if (document.fullscreenElement) document.exitFullscreen?.();
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.body.classList.contains('presentation')) {
+    document.body.classList.remove('presentation');
+    document.getElementById('btn-presentation').textContent = '📊 Apresentação';
+  }
+});
+
+// ══════════════════════════════════════════════
 //  BASE REGIONAIS (hardcoded)
 // ══════════════════════════════════════════════
 const BASE_REGIONAIS = [
@@ -756,9 +875,12 @@ function saveObs() {
   const text = document.getElementById('obs-textarea').value.trim();
   const key = 'aq_obs_'+currentRow.matricula;
   if (text) {
-    localStorage.setItem(key, JSON.stringify({text, date: new Date().toLocaleDateString('pt-BR'), semana: currentRow.periodo}));
+    const obsObj = {text, date: new Date().toLocaleDateString('pt-BR'), semana: currentRow.periodo};
+    localStorage.setItem(key, JSON.stringify(obsObj));
+    upsertObsSupabase(currentRow.matricula, currentRow.periodo, text, currentRow.auditor);
   } else {
     localStorage.removeItem(key);
+    deleteObsSupabase(currentRow.matricula, currentRow.periodo);
   }
   currentRow._obs = text ? {text, date: new Date().toLocaleDateString('pt-BR'), semana: currentRow.periodo} : null;
   renderTable();
@@ -1197,15 +1319,19 @@ function exportExcel() {
 // ══════════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════════
-(function init() {
+(async function init() {
+  initSupabase();
   const saved = loadData();
   if (saved && saved.length) {
+    const periodo = saved[0]?.periodo;
+    if (periodo) {
+      await loadObsSupabase(periodo);
+    }
     allData = saved.map(d => ({...d, _obs: getObs(d.matricula)}));
-    // Restore period label
-    if (allData[0]?.periodo) {
+    if (periodo) {
       const meses = ['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-      const [mm,yy] = allData[0].periodo.split('/');
-      const mf = meses[parseInt(mm)] ? meses[parseInt(mm)]+'/'+yy : allData[0].periodo;
+      const [mm,yy] = periodo.split('/');
+      const mf = meses[parseInt(mm)] ? meses[parseInt(mm)]+'/'+yy : periodo;
       document.getElementById('header-period').textContent = mf;
       document.getElementById('header-period').style.display='';
     }
