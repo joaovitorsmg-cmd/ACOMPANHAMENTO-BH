@@ -505,6 +505,48 @@ body.presentation .table-title { font-size: 15px !important; }
 }
 body.presentation .presentation-banner { display: block; }
 
+/* ── AUDITOR CHART ── */
+.auditor-chart-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap: 10px; margin-bottom: 16px; }
+.auditor-card { background: var(--surface); border-radius: var(--radius); padding: 12px 14px; border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
+.auditor-name { font-size: 11px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: .3px; margin-bottom: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar-row { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+.bar-label { font-size: 10px; font-weight: 700; width: 56px; flex-shrink: 0; }
+.bar-track { flex: 1; background: var(--surface2); border-radius: 3px; height: 10px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 3px; transition: width .4s ease; }
+.bar-count { font-size: 11px; font-weight: 800; width: 20px; text-align: right; flex-shrink: 0; }
+.kpi-trend { font-size: 10px; font-weight: 600; margin-top: 4px; min-height: 14px; }
+
+/* ── OPENING SLIDE ── */
+#pres-slide {
+  position: fixed; inset: 0; z-index: 300;
+  background: linear-gradient(135deg, #0D47A1 0%, #1565C0 60%, #0a2d6b 100%);
+  color: #fff; display: none;
+  flex-direction: column; align-items: center; justify-content: center;
+  gap: 28px; cursor: pointer; text-align: center; padding: 40px;
+}
+.ps-logo { height: 56px; background: #fff; padding: 8px 20px; border-radius: 10px; }
+.ps-title { font-size: 32px; font-weight: 800; letter-spacing: -.5px; }
+.ps-period { font-size: 18px; opacity: .75; font-weight: 500; }
+.ps-kpis { display: flex; gap: 48px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+.ps-kpi-item { text-align: center; }
+.ps-kpi-num { font-size: 88px; font-weight: 900; line-height: 1; }
+.ps-kpi-label { font-size: 14px; opacity: .8; margin-top: 6px; font-weight: 600; letter-spacing: .3px; }
+.ps-hint { font-size: 12px; opacity: .5; margin-top: 16px; }
+.ps-shortcut-bar { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.55); color: #fff; padding: 6px 16px; border-radius: 20px; font-size: 11px; font-weight: 500; letter-spacing: .3px; white-space: nowrap; }
+body:not(.presentation) .ps-shortcut-bar { display: none; }
+
+/* ── PRINT ── */
+@media print {
+  .header { position: relative !important; box-shadow: none !important; }
+  .header-actions, .btn-capture, .btn-upload, .warning-banner,
+  .filter-bar, #sup-section, #auditor-chart,
+  .modal-overlay, #pres-slide, .presentation-banner, .ps-shortcut-bar { display: none !important; }
+  body { background: #fff !important; }
+  .kpi-card { break-inside: avoid; border: 2px solid #ccc !important; box-shadow: none !important; }
+  .table-wrapper { break-inside: avoid; box-shadow: none !important; }
+  tr.row-green { display: none !important; }
+}
+
 /* ── RESPONSIVE ── */
 @media (max-width: 700px) {
   .kpi-row { grid-template-columns: repeat(2, 1fr); }
@@ -529,6 +571,16 @@ body.presentation .presentation-banner { display: block; }
 </header>
 
 <div class="presentation-banner">▶ MODO APRESENTAÇÃO — pressione ESC para sair</div>
+
+<!-- OPENING SLIDE -->
+<div id="pres-slide" onclick="document.getElementById('pres-slide').style.display='none'">
+  <img src="assets/logo.png" class="ps-logo" alt="Agroquima">
+  <div class="ps-title">Banco de Horas</div>
+  <div class="ps-period" id="ps-period">—</div>
+  <div class="ps-kpis" id="ps-kpis"></div>
+  <div class="ps-hint">clique para ver detalhes</div>
+</div>
+<div class="ps-shortcut-bar">P apresentação · 1-4 filtro KPI · 0 limpar · C capturar · E excel · Ctrl+P imprimir</div>
 
 <!-- WARNING BANNER -->
 <div class="warning-banner">
@@ -588,22 +640,32 @@ body.presentation .presentation-banner { display: block; }
       <div class="kpi-label">🔴 Críticos &gt; 6h</div>
       <div class="kpi-value" id="kv-critico">0</div>
       <div class="kpi-sub">Exigem observação urgente</div>
+      <div class="kpi-trend" id="kt-critico"></div>
     </div>
     <div class="kpi-card yellow" onclick="filterByKPI('atencao')" id="kpi-atencao">
       <div class="kpi-label">🟡 Atenção 4h–6h</div>
       <div class="kpi-value" id="kv-atencao">0</div>
       <div class="kpi-sub">Zona de alerta</div>
+      <div class="kpi-trend" id="kt-atencao"></div>
     </div>
     <div class="kpi-card green" onclick="filterByKPI('ok')" id="kpi-ok">
       <div class="kpi-label">🟢 OK &lt; 4h</div>
       <div class="kpi-value" id="kv-ok">0</div>
       <div class="kpi-sub">Positivos regulares</div>
+      <div class="kpi-trend" id="kt-ok"></div>
     </div>
     <div class="kpi-card orange" onclick="filterByKPI('supervisor')" id="kpi-sup">
       <div class="kpi-label">🟠 Supervisores positivos</div>
       <div class="kpi-value" id="kv-sup">0</div>
       <div class="kpi-sub">Cobrados diretamente</div>
+      <div class="kpi-trend" id="kt-supervisor"></div>
     </div>
+  </div>
+
+  <!-- AUDITOR CHART -->
+  <div id="auditor-chart" style="display:none">
+    <div class="section-title">📊 Situação por Auditor <span>(atalhos: P=apresentação 1-4=filtro C=capturar E=excel)</span></div>
+    <div class="auditor-chart-grid" id="auditor-chart-inner"></div>
   </div>
 
   <!-- TABLE -->
@@ -765,19 +827,176 @@ async function deleteObsSupabase(matricula, periodo) {
 }
 
 // ══════════════════════════════════════════════
+//  SNAPSHOTS — histórico semanal
+// ══════════════════════════════════════════════
+let prevSnapshot = null;
+
+function buildAuditorStats(data) {
+  const stats = {};
+  data.forEach(d => {
+    if (!d.auditor || d.auditor === 'Gerente Administrativo') return;
+    if (!stats[d.auditor]) stats[d.auditor] = {criticos:0, atencao:0, ok:0};
+    if (d.saldo_min > 0 && d.status !== 'negativo' && d.status !== 'zero') {
+      stats[d.auditor][d.status]++;
+    }
+  });
+  return stats;
+}
+
+async function saveSnapshot(data, periodo) {
+  if (!sb || !periodo) return;
+  const snap = {
+    periodo,
+    total: data.length,
+    criticos: data.filter(d => d.status === 'critico').length,
+    atencao: data.filter(d => d.status === 'atencao').length,
+    ok_count: data.filter(d => d.status === 'ok').length,
+    supervisores: data.filter(d => d.isSup && d.saldo_min > 0).length,
+    por_auditor: buildAuditorStats(data),
+    updated_at: new Date().toISOString()
+  };
+  try {
+    await sb.from('banco_horas_snapshots').upsert(snap, {onConflict: 'periodo'});
+  } catch(e) {}
+}
+
+async function loadPrevSnapshot(periodo) {
+  if (!sb || !periodo) return;
+  try {
+    const { data } = await sb.from('banco_horas_snapshots')
+      .select('*')
+      .neq('periodo', periodo)
+      .order('updated_at', {ascending: false})
+      .limit(1);
+    prevSnapshot = data?.[0] || null;
+  } catch(e) { prevSnapshot = null; }
+}
+
+// ══════════════════════════════════════════════
+//  TENDÊNCIAS — comparativo vs semana anterior
+// ══════════════════════════════════════════════
+function updateTrends(base) {
+  if (!prevSnapshot) {
+    ['critico','atencao','ok','supervisor'].forEach(k => {
+      const el = document.getElementById('kt-'+k);
+      if (el) el.textContent = '';
+    });
+    return;
+  }
+  const cur = {
+    critico: base.filter(d=>d.status==='critico').length,
+    atencao: base.filter(d=>d.status==='atencao').length,
+    ok: base.filter(d=>d.status==='ok').length,
+    supervisor: base.filter(d=>d.isSup && d.saldo_min>0).length
+  };
+  setTrend('critico', cur.critico, prevSnapshot.criticos, true);
+  setTrend('atencao', cur.atencao, prevSnapshot.atencao, true);
+  setTrend('ok', cur.ok, prevSnapshot.ok_count, false);
+  setTrend('supervisor', cur.supervisor, prevSnapshot.supervisores, true);
+}
+
+function setTrend(key, cur, prev, lowerIsBetter) {
+  const el = document.getElementById('kt-'+key);
+  if (!el || prev == null) return;
+  const diff = cur - prev;
+  if (diff === 0) { el.textContent = '→ igual à semana anterior'; el.style.color = 'var(--text3)'; return; }
+  const good = lowerIsBetter ? diff < 0 : diff > 0;
+  el.textContent = (diff > 0 ? '↑ +' : '↓ ') + Math.abs(diff) + ' vs semana anterior';
+  el.style.color = good ? 'var(--green)' : 'var(--red)';
+}
+
+// ══════════════════════════════════════════════
+//  GRÁFICO POR AUDITOR
+// ══════════════════════════════════════════════
+function renderAuditorChart(data) {
+  const container = document.getElementById('auditor-chart');
+  const inner = document.getElementById('auditor-chart-inner');
+  if (!inner) return;
+  const stats = buildAuditorStats(data);
+  const auditors = Object.keys(stats).sort();
+  if (!auditors.length) { container.style.display='none'; return; }
+  const maxCrit = Math.max(...auditors.map(a => stats[a].criticos), 1);
+  inner.innerHTML = auditors.map(a => {
+    const s = stats[a];
+    const pct = v => Math.round((v/maxCrit)*100);
+    return `<div class="auditor-card">
+      <div class="auditor-name" title="${a}">${a.split(' ')[0]} ${a.split(' ').slice(-1)[0]}</div>
+      <div class="bar-row">
+        <span class="bar-label" style="color:var(--red)">Crítico</span>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct(s.criticos)}%;background:var(--red)"></div></div>
+        <span class="bar-count" style="color:var(--red)">${s.criticos}</span>
+      </div>
+      <div class="bar-row">
+        <span class="bar-label" style="color:var(--yellow)">Atenção</span>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct(s.atencao)}%;background:var(--yellow)"></div></div>
+        <span class="bar-count" style="color:var(--yellow)">${s.atencao}</span>
+      </div>
+      <div class="bar-row">
+        <span class="bar-label" style="color:var(--green)">OK</span>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct(s.ok)}%;background:var(--green)"></div></div>
+        <span class="bar-count" style="color:var(--green)">${s.ok}</span>
+      </div>
+    </div>`;
+  }).join('');
+  container.style.display = '';
+}
+
+// ══════════════════════════════════════════════
 //  MODO APRESENTAÇÃO
 // ══════════════════════════════════════════════
 function togglePresentation() {
   const on = document.body.classList.toggle('presentation');
   document.getElementById('btn-presentation').textContent = on ? '✖ Sair' : '📊 Apresentação';
-  if (on) document.documentElement.requestFullscreen?.().catch(()=>{});
-  else if (document.fullscreenElement) document.exitFullscreen?.();
-}
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && document.body.classList.contains('presentation')) {
-    document.body.classList.remove('presentation');
-    document.getElementById('btn-presentation').textContent = '📊 Apresentação';
+  if (on) {
+    updatePresSlide();
+    document.getElementById('pres-slide').style.display = 'flex';
+    document.documentElement.requestFullscreen?.().catch(()=>{});
+  } else {
+    document.getElementById('pres-slide').style.display = 'none';
+    if (document.fullscreenElement) document.exitFullscreen?.();
   }
+}
+
+function updatePresSlide() {
+  document.getElementById('ps-period').textContent = document.getElementById('header-period').textContent || '';
+  const kpis = [
+    {id:'kv-critico', label:'Críticos', color:'#ff5252'},
+    {id:'kv-atencao', label:'Atenção', color:'#ffd740'},
+    {id:'kv-ok', label:'OK', color:'#69f0ae'},
+    {id:'kv-sup', label:'Supervisores', color:'#ff9100'}
+  ];
+  document.getElementById('ps-kpis').innerHTML = kpis.map(k =>
+    `<div class="ps-kpi-item">
+      <div class="ps-kpi-num" style="color:${k.color}">${document.getElementById(k.id).textContent}</div>
+      <div class="ps-kpi-label">${k.label}</div>
+    </div>`
+  ).join('');
+}
+
+document.addEventListener('keydown', e => {
+  const inField = e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT';
+  if (e.key === 'Escape') {
+    if (document.body.classList.contains('presentation')) {
+      document.getElementById('pres-slide').style.display = 'none';
+      document.body.classList.remove('presentation');
+      document.getElementById('btn-presentation').textContent = '📊 Apresentação';
+      if (document.fullscreenElement) document.exitFullscreen?.();
+    }
+    return;
+  }
+  if (inField) return;
+  if (e.key === 'p' || e.key === 'P') togglePresentation();
+  if (e.key === '1') filterByKPI('critico');
+  if (e.key === '2') filterByKPI('atencao');
+  if (e.key === '3') filterByKPI('ok');
+  if (e.key === '4') filterByKPI('supervisor');
+  if (e.key === '0') {
+    kpiFilter = null;
+    document.querySelectorAll('.kpi-card').forEach(c=>c.classList.remove('selected'));
+    applyFilters();
+  }
+  if (e.key === 'c' || e.key === 'C') captureImage();
+  if (e.key === 'e' || e.key === 'E') exportExcel();
 });
 
 // ══════════════════════════════════════════════
@@ -1002,7 +1221,6 @@ function parseXLSX(file) {
       
       allData = data;
       if (periodo) {
-        // Format: 10/2026 -> Outubro/2026
         const meses = ['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
         const [mm,yy] = periodo.split('/');
         const mFormatted = meses[parseInt(mm)] ? meses[parseInt(mm)]+'/'+yy : periodo;
@@ -1010,6 +1228,7 @@ function parseXLSX(file) {
         document.getElementById('header-period').style.display='';
       }
       saveData(data);
+      saveSnapshot(data, periodo);
       showPanel();
     } catch(err) {
       alert('Erro ao processar arquivo: '+err.message);
@@ -1033,6 +1252,7 @@ function showPanel() {
   document.getElementById('btn-reset').style.display='';
   populateFilterDropdowns();
   applyFilters();
+  renderAuditorChart(allData);
 }
 
 function handleFile(file) {
@@ -1170,6 +1390,7 @@ function updateKPIs() {
   document.getElementById('kv-atencao').textContent = base.filter(d=>d.status==='atencao').length;
   document.getElementById('kv-ok').textContent = base.filter(d=>d.status==='ok').length;
   document.getElementById('kv-sup').textContent = base.filter(d=>d.isSup && d.saldo_min>0).length;
+  updateTrends(base);
 }
 
 // ══════════════════════════════════════════════
@@ -1325,7 +1546,7 @@ function exportExcel() {
   if (saved && saved.length) {
     const periodo = saved[0]?.periodo;
     if (periodo) {
-      await loadObsSupabase(periodo);
+      await Promise.all([loadObsSupabase(periodo), loadPrevSnapshot(periodo)]);
     }
     allData = saved.map(d => ({...d, _obs: getObs(d.matricula)}));
     if (periodo) {
