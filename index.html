@@ -2222,7 +2222,7 @@ function openCPModal(idx) {
       else if (d.hasMarcIrr || d.hasSemMark) rowClass = 'interv';
       const ocs = d.ocs.filter(o=>o.tipo!=='0').map(o=>`${o.tipo}: ${o.qtde}`).join(', ');
       return `<div class="cp-day-row ${rowClass}">
-        <span style="font-weight:700">${d.dia||'—'} ${d.data.slice(8)}</span>
+        <span style="font-weight:700">${d.dia||'—'} ${d.data.slice(8)}/${d.data.slice(5,7)}/${d.data.slice(2,4)}</span>
         <span class="cp-day-marcacoes">${d.marcacoes||'—'}</span>
         <span style="font-size:11px;color:var(--text2)">${ocs}</span>
         <span class="cp-day-he" style="color:${d.heMin>120?'var(--red)':d.heMin>60?'var(--yellow)':'var(--text2)'}">
