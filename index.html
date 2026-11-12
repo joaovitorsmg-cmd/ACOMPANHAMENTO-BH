@@ -112,6 +112,8 @@ body {
   color: #fff;
 }
 .header-actions { display: flex; gap: 8px; align-items: center; }
+.btn-clear-all { background:none;border:none;cursor:pointer;font-size:14px;opacity:.08;transition:opacity .3s;padding:4px 6px;border-radius:6px;color:var(--text);line-height:1; }
+.btn-clear-all:hover { opacity:.5;background:rgba(255,255,255,.1); }
 .btn-icon {
   background: rgba(255,255,255,.15);
   border: none;
@@ -608,8 +610,34 @@ body:not(.presentation) .ps-shortcut-bar { display: none; }
     <button class="btn-icon" id="btn-presentation" onclick="togglePresentation()" title="Modo Apresentação">📊 Apresentação</button>
     <button class="btn-icon" onclick="toggleTheme()" title="Alternar tema">🌓</button>
     <button class="btn-icon btn-danger" id="btn-reset" style="display:none" onclick="confirmReset()">🔄 Atualizar Base</button>
+    <button class="btn-clear-all" id="btn-clear-all" onclick="showClearAll()" title="Limpeza geral de dados">⚙</button>
   </div>
 </header>
+
+<!-- MODAL LIMPEZA GERAL -->
+<div id="clearall-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:none;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:32px;max-width:400px;width:90%;text-align:center">
+    <div id="clearall-step1">
+      <div style="font-size:36px;margin-bottom:12px">⚠️</div>
+      <div style="font-size:17px;font-weight:700;margin-bottom:8px;color:var(--red)">Limpeza Geral</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:24px;line-height:1.5">Isso apagará <strong>todos os dados</strong> do painel:<br>arquivos carregados, observações salvas na nuvem e dados do Cartão de Ponto.<br><br>Esta ação é irreversível.</div>
+      <div style="display:flex;gap:10px;justify-content:center">
+        <button onclick="closeClearAll()" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);cursor:pointer;font-size:13px">Cancelar</button>
+        <button onclick="clearAllStep2()" style="flex:1;padding:10px;border-radius:8px;border:none;background:var(--red);color:#fff;cursor:pointer;font-weight:700;font-size:13px">Continuar →</button>
+      </div>
+    </div>
+    <div id="clearall-step2" style="display:none">
+      <div style="font-size:36px;margin-bottom:12px">🗑️</div>
+      <div style="font-size:17px;font-weight:700;margin-bottom:8px;color:var(--red)">Confirmar exclusão total</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:16px">Digite <strong>LIMPAR</strong> para confirmar:</div>
+      <input id="clearall-input" type="text" placeholder="LIMPAR" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:14px;text-align:center;text-transform:uppercase;margin-bottom:16px;box-sizing:border-box" oninput="const b=document.getElementById('clearall-btn-confirm');const ok=this.value.trim().toUpperCase()==='LIMPAR';b.disabled=!ok;b.style.opacity=ok?'1':'.4'">
+      <div style="display:flex;gap:10px;justify-content:center">
+        <button onclick="closeClearAll()" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);cursor:pointer;font-size:13px">Cancelar</button>
+        <button id="clearall-btn-confirm" onclick="executeFullClear()" disabled style="flex:1;padding:10px;border-radius:8px;border:none;background:var(--red);color:#fff;cursor:pointer;font-weight:700;font-size:13px;opacity:.4" onmouseenter="this.style.opacity=this.disabled?'.4':'1'" onmouseleave="this.style.opacity=this.disabled?'.4':'.9'">🗑️ Apagar tudo</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="presentation-banner">▶ MODO APRESENTAÇÃO — pressione ESC para sair</div>
 
@@ -931,7 +959,7 @@ body:not(.presentation) .ps-shortcut-bar { display: none; }
 //  SUPABASE
 // ══════════════════════════════════════════════
 const SB_URL = 'https://yeburvkopwbmnfcmthtz.supabase.co';
-const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InllYnVydmtvcHdibW5mY210aHR6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3NzYwMzMsImV4cCI6MjA5NTM1MjAzM30.3t-4Q8SM9XV0OdQLHktMUmKNItg1byBkyv0HGN3B-74';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InllYnVydmtvcHdibW5mY210aHR6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI2ODk5NDMsImV4cCI6MjEwODI2NTk0M30.3t-4Q8SM9XV0OdQLHktMUmKNItg1byBkyv0HGN3B-74';
 let sb = null;
 
 function initSupabase() {
@@ -1699,6 +1727,49 @@ function exportExcel() {
   XLSX.utils.book_append_sheet(wb, ws, 'Banco de Horas');
   const now = new Date();
   XLSX.writeFile(wb, `BancoHoras_${now.toLocaleDateString('pt-BR').replace(/\//g,'-')}.xlsx`);
+}
+
+// ══════════════════════════════════════════════
+//  LIMPEZA GERAL
+// ══════════════════════════════════════════════
+function showClearAll() {
+  document.getElementById('clearall-step1').style.display='block';
+  document.getElementById('clearall-step2').style.display='none';
+  document.getElementById('clearall-input') && (document.getElementById('clearall-input').value='');
+  const o = document.getElementById('clearall-overlay');
+  o.style.display='flex';
+}
+function closeClearAll() { document.getElementById('clearall-overlay').style.display='none'; }
+function clearAllStep2() {
+  document.getElementById('clearall-step1').style.display='none';
+  document.getElementById('clearall-step2').style.display='block';
+  document.getElementById('clearall-btn-confirm').disabled=true;
+  document.getElementById('clearall-btn-confirm').style.opacity='.4';
+  setTimeout(()=>document.getElementById('clearall-input').focus(),50);
+}
+async function executeFullClear() {
+  closeClearAll();
+  // Clear localStorage (all aq_ keys)
+  Object.keys(localStorage).filter(k=>k.startsWith('aq_')).forEach(k=>localStorage.removeItem(k));
+  // Clear Supabase
+  if (sb) {
+    try {
+      await sb.from('banco_horas_obs').delete().neq('matricula','__never__');
+      await sb.from('banco_horas_snapshots').delete().neq('periodo','__never__');
+    } catch(e) { /* ignore */ }
+  }
+  // Reset state
+  allData=[]; cpAllData=[]; cpFiltered=[];
+  document.getElementById('tab-badge-bh').style.display='none';
+  document.getElementById('tab-badge-cp').style.display='none';
+  activeTab='bh';
+  document.getElementById('tab-btn-bh').classList.add('active');
+  document.getElementById('tab-btn-cp').classList.remove('active');
+  showUpload();
+  document.getElementById('cp-upload-screen').style.display='none';
+  document.getElementById('cp-main').style.display='none';
+  document.getElementById('main-content').style.display='none';
+  document.getElementById('upload-screen').style.display='flex';
 }
 
 // ══════════════════════════════════════════════
