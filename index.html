@@ -115,6 +115,10 @@ body {
 .btn-clear-all { background:none;border:none;cursor:pointer;font-size:14px;opacity:.08;transition:opacity .3s;padding:4px 6px;border-radius:6px;color:var(--text);line-height:1; }
 .btn-clear-all:hover { opacity:.5;background:rgba(255,255,255,.1); }
 .cp-auditor-group td { background:var(--bg);border-top:2px solid var(--accent);padding:8px 12px;position:sticky;top:0;z-index:1; }
+.cp-porteiro-btn { position:fixed;bottom:18px;right:18px;background:var(--surface);border:1px solid var(--border);border-radius:50%;width:32px;height:32px;font-size:14px;cursor:pointer;opacity:.15;transition:opacity .25s, border-color .25s;z-index:200;display:none }
+.cp-porteiro-btn:hover { opacity:.6; }
+.cp-porteiro-btn.active { opacity:.9;border-color:var(--accent); }
+tr.row-porteiro td { opacity:.5;font-style:italic; }
 .btn-icon {
   background: rgba(255,255,255,.15);
   border: none;
@@ -681,14 +685,14 @@ body:not(.presentation) .ps-shortcut-bar { display: none; }
 <div id="cp-main">
   <div class="filter-bar" id="cp-filter-bar">
     <span class="filter-label">Região</span>
-    <select class="filter-select" id="cpf-regiao" onchange="applyCPFilters()">
+    <select class="filter-select" id="cpf-regiao" onchange="onCPRegiaoChange()">
       <option value="">Todas</option>
       <option value="SUL">SUL</option>
       <option value="NORTE">NORTE</option>
     </select>
     <div class="filter-sep"></div>
     <span class="filter-label">Auditor</span>
-    <select class="filter-select" id="cpf-auditor" onchange="applyCPFilters()"></select>
+    <select class="filter-select" id="cpf-auditor" onchange="onCPAuditorChange()"></select>
     <div class="filter-sep"></div>
     <span class="filter-label">Filial</span>
     <select class="filter-select" id="cpf-filial" onchange="applyCPFilters()"></select>
@@ -757,6 +761,7 @@ body:not(.presentation) .ps-shortcut-bar { display: none; }
       </table>
     </div>
   </div>
+  <button class="cp-porteiro-btn" id="cp-porteiro-btn" onclick="togglePorteiros()" title="Porteiros (ocultos da análise)">🚪</button>
 </div>
 
 <!-- CP MODAL -->
@@ -1797,28 +1802,50 @@ function switchTab(tab) {
 // ══════════════════════════════════════════════
 //  CARTÃO DE PONTO — MATCHING (CNPJ direto)
 // ══════════════════════════════════════════════
+// CNPJ direto → número da filial (F02 não existe, era F01; F18 = ADM própria)
 const CP_CNPJ_MAP = {
-  '01626951000133':1,'01626951000214':1,  // F01/F02 → MTZ (mesmo auditor)
-  '01626951000303':3,'01626951000486':4,'01626951000567':5,
-  '01626951001024':10,'01626951001105':11,'01626951001296':12,
-  '01626951001377':13,'01626951001458':14,'01626951001539':15,
-  '01626951001610':16,'01626951001709':17,
-  '01626951001881':19,'01626951001962':19, // F18/F19 → PAL
-  '01626951002187':21,'01626951002268':22,'01626951002349':23,
-  '01626951002420':24,'01626951002500':25,'01626951002691':26,
-  '01626951002772':27,'01626951002853':28,'01626951002934':29,
-  '01626951003078':30,'01626951003159':31,'01626951003230':32,
-  '01626951003310':33,'01626951003400':34,'01626951003582':35,
-  '01626951003663':36,'01626951003744':37,'01626951003825':38,
-  '01626951003906':39,'01626951004040':40,'01626951004120':41
+  '01626951000133':1,   // F01 MTZ Goiânia
+  '01626951000303':3,   // F03 ARG Araguaína
+  '01626951000486':4,   // F04 RVD Rio Verde
+  '01626951000567':5,   // F05 UBR Uberlândia
+  '01626951001024':10,  // F10 MAR Marabá
+  '01626951001105':11,  // F11 JAT Jataí
+  '01626951001296':12,  // F12 CRI Cristalina
+  '01626951001377':13,  // F13 FAG UBS
+  '01626951001458':14,  // F14 RED Redenção
+  '01626951001610':16,  // F16 IMP Imperatriz
+  '01626951001709':17,  // F17 BAR Barra do Garças
+  '01626951001881':18,  // F18 ADM Administração
+  '01626951001962':19,  // F19 PAL Palmas
+  '01626951002187':21,  // F21 MOZ Mozarlândia
+  '01626951002268':22,  // F22 PGM Paragominas
+  '01626951002349':23,  // F23 SFX São Félix do Xingu
+  '01626951002420':24,  // F24 FAP Fábrica Aparecida
+  '01626951002500':25,  // F25 FCB Cuiabá
+  '01626951002772':27,  // F27 URU Uruaçu
+  '01626951002853':28,  // F28 MOR Morrinhos
+  '01626951002934':29,  // F29 CON Confresa
+  '01626951003078':30,  // F30 FOR Formosa
+  '01626951003159':31,  // F31 JUS Jussara
+  '01626951003230':32,  // F32 XRA Xinguara
+  '01626951003400':34,  // F34 POR Porangatu
+  '01626951003582':35,  // F35 PLA Pontes e Lacerda
+  '01626951003663':36,  // F36 GRA Goianira
+  '01626951003744':37,  // F37 CAN Canarana
+  '01626951003825':38,  // F38 GUR Gurupi
+  '01626951004040':40,  // F40 RIA Rialma
+  '01626951004120':41   // F41 ALT Altamira
 };
+const F18_ADM = {filial:18,sigla:'ADM',loja:'ADMINISTRAÇÃO',estado:'GO',auditor:'ADMINISTRAÇÃO',regiao:'SUL'};
 const CP_CNPJ_CACHE = {};
 
 function matchFilialCP(cnpj) {
   const digits = (cnpj||'').replace(/\D/g,'').slice(0,14);
   if (digits in CP_CNPJ_CACHE) return CP_CNPJ_CACHE[digits];
   const filNum = CP_CNPJ_MAP[digits];
-  const b = filNum ? (BASE_REGIONAIS.find(r=>r.filial===filNum)||null) : null;
+  let b = null;
+  if (filNum === 18) b = F18_ADM;
+  else if (filNum) b = BASE_REGIONAIS.find(r=>r.filial===filNum)||null;
   CP_CNPJ_CACHE[digits] = b;
   return b;
 }
@@ -1935,6 +1962,7 @@ function showCPPanel() {
   switchTab('cp');
   document.getElementById('cp-upload-screen').style.display = 'none';
   document.getElementById('cp-main').style.display = 'block';
+  showPorteiros = false;
   populateCPFilters();
   applyCPFilters();
   const badge = document.getElementById('tab-badge-cp');
@@ -1950,11 +1978,58 @@ function confirmResetCP() {
   }
 }
 
+function fillSelectPreserve(id, values) {
+  const s = document.getElementById(id);
+  const prev = s.value;
+  s.innerHTML = '<option value="">Todos</option>' + values.map(v=>`<option value="${v}"${v===prev?' selected':''}>${v}</option>`).join('');
+  if (!values.includes(prev)) s.value = '';
+}
+
+function cpSubset(reg, aud) {
+  return cpAllData.filter(e => {
+    if (reg && e.filial?.regiao !== reg) return false;
+    if (aud && e.filial?.auditor !== aud) return false;
+    return true;
+  });
+}
+
+function onCPRegiaoChange() {
+  const reg = document.getElementById('cpf-regiao').value;
+  const sub = cpSubset(reg, '');
+  fillSelectPreserve('cpf-auditor', [...new Set(sub.map(e=>e.filial?.auditor).filter(Boolean))].sort());
+  const aud = document.getElementById('cpf-auditor').value;
+  const sub2 = cpSubset(reg, aud);
+  fillSelectPreserve('cpf-filial', [...new Set(sub2.map(e=>
+    e.filial&&e.filial.sigla!=='ADM' ? `F${String(e.filial.filial).padStart(2,'0')} ${e.filial.sigla}` : null
+  ).filter(Boolean))].sort());
+  applyCPFilters();
+}
+
+function onCPAuditorChange() {
+  const reg = document.getElementById('cpf-regiao').value;
+  const aud = document.getElementById('cpf-auditor').value;
+  const sub = cpSubset(reg, aud);
+  fillSelectPreserve('cpf-filial', [...new Set(sub.map(e=>
+    e.filial&&e.filial.sigla!=='ADM' ? `F${String(e.filial.filial).padStart(2,'0')} ${e.filial.sigla}` : null
+  ).filter(Boolean))].sort());
+  applyCPFilters();
+}
+
 function populateCPFilters() {
-  const auditors = [...new Set(cpAllData.map(e=>e.filial?.auditor).filter(Boolean))].sort();
-  const filiais = [...new Set(cpAllData.map(e=> e.filial ? `F${String(e.filial.filial).padStart(2,'0')} ${e.filial.sigla}` : '—'))].sort();
-  fillSelect('cpf-auditor', auditors);
-  fillSelect('cpf-filial', filiais);
+  onCPRegiaoChange();
+  document.getElementById('cp-porteiro-btn').style.display =
+    cpAllData.some(isPorteiro) ? '' : 'none';
+}
+
+// ══════════════════════════════════════════════
+//  PORTEIROS
+// ══════════════════════════════════════════════
+let showPorteiros = false;
+function isPorteiro(e) { return /porteiro/i.test(e.cargo||''); }
+function togglePorteiros() {
+  showPorteiros = !showPorteiros;
+  document.getElementById('cp-porteiro-btn').classList.toggle('active', showPorteiros);
+  renderCPTable();
 }
 
 function filterCPByKPI(type) {
@@ -2017,23 +2092,30 @@ function sortCPTable(col) {
 }
 
 function updateCPKPIs() {
-  const uniq = arr => [...new Set(arr)].length;
-  document.getElementById('cpkv-crit').textContent  = cpFiltered.filter(e=>e.diasHEcrit>0).length;
-  document.getElementById('cpkv-interv').textContent = cpFiltered.filter(e=>e.diasInterv>0).length;
-  document.getElementById('cpkv-marc').textContent   = cpFiltered.filter(e=>e.diasMarcIrr+e.diasSemMark>0).length;
-  document.getElementById('cpkv-falta').textContent  = cpFiltered.filter(e=>e.diasFalta+e.diasAtraso>0).length;
+  const data = cpFiltered.filter(e=>!isPorteiro(e));
+  document.getElementById('cpkv-crit').textContent  = data.filter(e=>e.diasHEcrit>0).length;
+  document.getElementById('cpkv-interv').textContent = data.filter(e=>e.diasInterv>0).length;
+  document.getElementById('cpkv-marc').textContent   = data.filter(e=>e.diasMarcIrr+e.diasSemMark>0).length;
+  document.getElementById('cpkv-falta').textContent  = data.filter(e=>e.diasFalta+e.diasAtraso>0).length;
 }
 
 function renderCPTable() {
   const tbody = document.getElementById('cp-table-body');
-  document.getElementById('cp-table-count').textContent = cpFiltered.length + ' colaborador(es)';
   if (!cpFiltered.length) {
+    document.getElementById('cp-table-count').textContent = '0 colaborador(es)';
     tbody.innerHTML='<tr class="empty-row"><td colspan="9">Nenhum colaborador com irregularidades nos filtros selecionados.</td></tr>';
     return;
   }
 
+  // Separate porteiros
+  const porteiros = cpFiltered.filter(isPorteiro);
+  const normais = cpFiltered.filter(e=>!isPorteiro(e));
+  const toRender = showPorteiros ? [...normais, ...porteiros] : normais;
+  document.getElementById('cp-table-count').textContent =
+    normais.length + ' colaborador(es)' + (porteiros.length && !showPorteiros ? ` (+${porteiros.length} porteiro(s) oculto(s))` : '');
+
   // Sort: auditor → filial → HE crit desc
-  const sorted = [...cpFiltered].sort((a,b)=>{
+  const sorted = [...toRender].sort((a,b)=>{
     const aa = a.filial?.auditor||'zzz', ba = b.filial?.auditor||'zzz';
     if(aa<ba) return -1; if(aa>ba) return 1;
     const af = a.filial?.sigla||'zzz', bf = b.filial?.sigla||'zzz';
@@ -2041,6 +2123,10 @@ function renderCPTable() {
     return b.diasHEcrit - a.diasHEcrit;
   });
 
+  if (!sorted.length) {
+    tbody.innerHTML='<tr class="empty-row"><td colspan="9">Nenhuma ocorrência nos filtros selecionados.</td></tr>';
+    return;
+  }
   // Update cpFiltered to match sorted order so modal indices stay consistent
   cpFiltered.length = 0; sorted.forEach(e=>cpFiltered.push(e));
 
@@ -2078,7 +2164,7 @@ function renderCPTable() {
     if(e.diasMarcIrr||e.diasSemMark) badges.push(`<span class="vbadge vbadge-marcacao">🟣 ${e.diasMarcIrr+e.diasSemMark}d marc.</span>`);
     if(e.diasFalta)   badges.push(`<span class="vbadge vbadge-falta">❌ ${e.diasFalta}d falta</span>`);
     if(e.diasAtraso)  badges.push(`<span class="vbadge vbadge-atraso">⏰ ${e.diasAtraso}d atraso</span>`);
-    const rowClass = e.diasHEcrit ? 'row-red' : e.diasInterv||e.diasHEatenc ? 'row-yellow' : '';
+    const rowClass = isPorteiro(e) ? 'row-porteiro' : e.diasHEcrit ? 'row-red' : e.diasInterv||e.diasHEatenc ? 'row-yellow' : '';
     const cargo = e.cargo.replace(/^\d+-/,'').trim();
     html += `<tr class="${rowClass}" onclick="openCPModal(${i})">
       <td><strong>${e.nome}</strong><br><small style="color:var(--text2)">${cargo}</small></td>
@@ -2110,8 +2196,16 @@ function openCPModal(idx) {
   document.getElementById('cpm-s-falta').textContent  = e.diasFalta + e.diasAtraso;
 
   const diasOrdenados = [...e.dias].sort((a,b)=> a.data<b.data?-1:1);
-  document.getElementById('cpm-dias').innerHTML = diasOrdenados
-    .filter(d => d.heMin>0||d.hasInterv||d.hasMarcIrr||d.hasSemMark||d.hasFalta||d.hasAtraso)
+  const kpiFilterLabel = {he_crit:'HE > 2h/dia',he_atenc:'HE 1-2h/dia',intervalo:'Intervalo irregular',marcacao:'Marcação irregular',falta:'Faltas e atrasos'}[cpKPIFilter];
+  document.getElementById('cpm-dias').previousElementSibling.textContent =
+    kpiFilterLabel ? `Detalhe por Dia — ${kpiFilterLabel}` : 'Detalhe por Dia';
+  let diasBase = diasOrdenados.filter(d => d.heMin>0||d.hasInterv||d.hasMarcIrr||d.hasSemMark||d.hasFalta||d.hasAtraso);
+  if (cpKPIFilter==='he_crit')    diasBase = diasBase.filter(d=>d.heMin>120);
+  else if (cpKPIFilter==='he_atenc')  diasBase = diasBase.filter(d=>d.heMin>60&&d.heMin<=120);
+  else if (cpKPIFilter==='intervalo') diasBase = diasBase.filter(d=>d.hasInterv);
+  else if (cpKPIFilter==='marcacao')  diasBase = diasBase.filter(d=>d.hasMarcIrr||d.hasSemMark);
+  else if (cpKPIFilter==='falta')     diasBase = diasBase.filter(d=>d.hasFalta||d.hasAtraso);
+  document.getElementById('cpm-dias').innerHTML = diasBase
     .map(d => {
       let rowClass = 'ok';
       if (d.heMin > 120) rowClass = 'crit';
