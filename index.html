@@ -470,6 +470,47 @@ textarea:focus { border-color: var(--accent); }
 }
 .section-title span { font-size: 12px; font-weight: 400; color: var(--text2); }
 
+/* ── TABS ── */
+.tab-nav { background: var(--surface); border-bottom: 2px solid var(--border); padding: 0 20px; display: flex; align-items: flex-end; gap: 4px; }
+.tab-btn { background: none; border: none; border-bottom: 3px solid transparent; padding: 10px 18px; font-size: 13px; font-weight: 700; color: var(--text2); cursor: pointer; transition: all .15s; margin-bottom: -2px; display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+.tab-btn:hover { color: var(--accent); }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); background: var(--accent-light); border-radius: 6px 6px 0 0; }
+.tab-badge { background: var(--red); color: #fff; border-radius: 10px; padding: 1px 7px; font-size: 10px; font-weight: 800; min-width: 18px; text-align: center; }
+.tab-badge.yellow { background: var(--yellow); }
+
+/* ── CP (CARTÃO DE PONTO) ── */
+#cp-upload-screen { display: none; flex-direction: column; align-items: center; justify-content: center; min-height: calc(100vh - 112px); padding: 40px 24px; gap: 24px; }
+#cp-main { display: none; padding: 16px 24px 32px; }
+.cp-kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+.cp-violation-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.vbadge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 10px; font-size: 10px; font-weight: 700; }
+.vbadge-he-crit { background: var(--red-border); color: var(--red); }
+.vbadge-he-atenc { background: var(--yellow-border); color: var(--yellow); }
+.vbadge-interval { background: var(--orange-border); color: var(--orange); }
+.vbadge-marcacao { background: #f3e5f5; color: #7b1fa2; }
+.vbadge-falta { background: #fce4ec; color: #c62828; }
+.vbadge-atraso { background: #fff8e1; color: #e65100; }
+.vbadge-semmark { background: var(--border); color: var(--text2); }
+.cp-day-grid { display: grid; gap: 6px; margin-top: 12px; }
+.cp-day-row { background: var(--surface2); border-radius: 6px; padding: 8px 12px; border-left: 4px solid var(--border); font-size: 12px; display: grid; grid-template-columns: 60px 90px 1fr auto; gap: 10px; align-items: center; }
+.cp-day-row.crit { border-left-color: var(--red); background: var(--red-bg); }
+.cp-day-row.atenc { border-left-color: var(--yellow); background: var(--yellow-bg); }
+.cp-day-row.interv { border-left-color: var(--orange); background: var(--orange-bg); }
+.cp-day-row.ok { border-left-color: var(--green); background: var(--green-bg); }
+.cp-day-marcacoes { font-family: monospace; font-size: 11px; color: var(--text2); }
+.cp-day-he { font-weight: 800; }
+.cp-modal { max-width: 680px !important; }
+.cp-emp-header { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 14px; }
+.cp-emp-info { flex: 1; }
+.cp-emp-name { font-size: 16px; font-weight: 800; }
+.cp-emp-meta { font-size: 11px; color: var(--text2); margin-top: 2px; }
+.cp-stats-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 14px; }
+.cp-stat { background: var(--surface2); border-radius: 8px; padding: 10px; text-align: center; border: 1px solid var(--border); }
+.cp-stat-num { font-size: 24px; font-weight: 900; }
+.cp-stat-label { font-size: 10px; color: var(--text2); font-weight: 600; margin-top: 2px; }
+.filial-unknown { font-size: 10px; color: var(--text3); font-style: italic; }
+@media (max-width: 700px) { .cp-kpi-row { grid-template-columns: repeat(2,1fr); } .cp-day-row { grid-template-columns: 50px 1fr; } }
+
 /* ── SYNC INDICATOR ── */
 .sync-dot {
   width: 8px; height: 8px; border-radius: 50%;
@@ -582,9 +623,132 @@ body:not(.presentation) .ps-shortcut-bar { display: none; }
 </div>
 <div class="ps-shortcut-bar">P apresentação · 1-4 filtro KPI · 0 limpar · C capturar · E excel · Ctrl+P imprimir</div>
 
+<!-- TAB NAV -->
+<div class="tab-nav" id="tab-nav">
+  <button class="tab-btn active" id="tab-btn-bh" onclick="switchTab('bh')">🏦 Banco de Horas <span class="tab-badge" id="tab-badge-bh" style="display:none">0</span></button>
+  <button class="tab-btn" id="tab-btn-cp" onclick="switchTab('cp')">📋 Marcações Irregulares <span class="tab-badge" id="tab-badge-cp" style="display:none">0</span></button>
+</div>
+
 <!-- WARNING BANNER -->
-<div class="warning-banner">
+<div class="warning-banner" id="bh-warning">
   ⚠️ &nbsp;Emita o relatório na <strong>quarta-feira após o expediente</strong> para garantir saldo completo de todos os colaboradores.
+</div>
+
+<!-- CP UPLOAD SCREEN -->
+<div id="cp-upload-screen">
+  <div class="upload-card" id="cp-drop-zone">
+    <label for="cp-file-input" style="display:block;cursor:pointer">
+      <div class="upload-icon">📋</div>
+      <h2>Cartão de Ponto — Marcações</h2>
+      <p>Arraste e solte o arquivo .xlsx aqui, ou clique para selecionar.<br>Identifica HE &gt; 2h, intervalos irregulares e marcações incorretas.</p>
+      <span class="btn-upload">📂 Selecionar arquivo .xlsx</span>
+    </label>
+    <input type="file" id="cp-file-input" accept=".xlsx,.xls" onchange="handleCPFile(this.files[0])">
+    <div class="upload-hint">Arquivo: Relatorio_CartaoDePontoLayout1_*.xlsx</div>
+  </div>
+</div>
+
+<!-- CP MAIN CONTENT -->
+<div id="cp-main">
+  <div class="filter-bar" id="cp-filter-bar">
+    <span class="filter-label">Região</span>
+    <select class="filter-select" id="cpf-regiao" onchange="applyCPFilters()">
+      <option value="">Todas</option>
+      <option value="SUL">SUL</option>
+      <option value="NORTE">NORTE</option>
+    </select>
+    <div class="filter-sep"></div>
+    <span class="filter-label">Auditor</span>
+    <select class="filter-select" id="cpf-auditor" onchange="applyCPFilters()"></select>
+    <div class="filter-sep"></div>
+    <span class="filter-label">Filial</span>
+    <select class="filter-select" id="cpf-filial" onchange="applyCPFilters()"></select>
+    <div class="filter-sep"></div>
+    <span class="filter-label">Violação</span>
+    <select class="filter-select" id="cpf-violacao" onchange="applyCPFilters()">
+      <option value="">Todas</option>
+      <option value="he_crit">HE &gt; 2h</option>
+      <option value="he_atenc">HE 1–2h</option>
+      <option value="intervalo">Intervalo irregular</option>
+      <option value="marcacao">Marcação irregular</option>
+      <option value="sem_marcacao">Sem marcação</option>
+      <option value="falta">Falta</option>
+      <option value="atraso">Entrada em atraso</option>
+    </select>
+    <div style="margin-left:auto;display:flex;gap:8px">
+      <button class="btn-capture" onclick="exportCPExcel()">📊 Exportar Excel</button>
+      <button class="btn-icon btn-danger" style="font-size:12px;padding:5px 10px" onclick="confirmResetCP()">🔄 Novo arquivo</button>
+    </div>
+  </div>
+
+  <div class="cp-kpi-row">
+    <div class="kpi-card red" onclick="filterCPByKPI('he_crit')" id="cpkpi-crit">
+      <div class="kpi-label">🔴 HE &gt; 2h no dia</div>
+      <div class="kpi-value" id="cpkv-crit">0</div>
+      <div class="kpi-sub">Colaboradores com ocorrência crítica</div>
+    </div>
+    <div class="kpi-card yellow" onclick="filterCPByKPI('intervalo')" id="cpkpi-interv">
+      <div class="kpi-label">🟡 Intervalo irregular</div>
+      <div class="kpi-value" id="cpkv-interv">0</div>
+      <div class="kpi-sub">Intervalo &lt; 60 min registrado</div>
+    </div>
+    <div class="kpi-card orange" onclick="filterCPByKPI('marcacao')" id="cpkpi-marc">
+      <div class="kpi-label">🟠 Marcação irregular</div>
+      <div class="kpi-value" id="cpkv-marc">0</div>
+      <div class="kpi-sub">Ponto incorreto ou sem marcação</div>
+    </div>
+    <div class="kpi-card" style="border-color:var(--border)" onclick="filterCPByKPI('falta')" id="cpkpi-falta">
+      <div class="kpi-label" style="color:var(--text2)">⚫ Faltas / Atrasos</div>
+      <div class="kpi-value" style="color:var(--text2)" id="cpkv-falta">0</div>
+      <div class="kpi-sub">Registros de falta ou entrada em atraso</div>
+    </div>
+  </div>
+
+  <div class="table-wrapper">
+    <div class="table-header-row">
+      <span class="table-title">Colaboradores com Irregularidades</span>
+      <span class="table-count" id="cp-table-count"></span>
+    </div>
+    <div class="table-scroll">
+      <table id="cp-table">
+        <thead>
+          <tr>
+            <th onclick="sortCPTable(0)">Colaborador <span class="sort-arrow">↕</span></th>
+            <th onclick="sortCPTable(1)">Filial / Auditor <span class="sort-arrow">↕</span></th>
+            <th onclick="sortCPTable(2)">HE &gt;2h <span class="sort-arrow">↕</span></th>
+            <th onclick="sortCPTable(3)">HE 1-2h <span class="sort-arrow">↕</span></th>
+            <th onclick="sortCPTable(4)">Intervalo <span class="sort-arrow">↕</span></th>
+            <th onclick="sortCPTable(5)">Sem marcação <span class="sort-arrow">↕</span></th>
+            <th onclick="sortCPTable(6)">Faltas <span class="sort-arrow">↕</span></th>
+            <th onclick="sortCPTable(7)">Max HE/dia <span class="sort-arrow">↕</span></th>
+            <th>Violations</th>
+          </tr>
+        </thead>
+        <tbody id="cp-table-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- CP MODAL -->
+<div class="modal-overlay" id="cp-modal-overlay" onclick="closeCPModal(event)">
+  <div class="modal cp-modal">
+    <button class="modal-close" onclick="closeCPModal()">✕</button>
+    <div class="cp-emp-header">
+      <div class="cp-emp-info">
+        <div class="cp-emp-name" id="cpm-nome"></div>
+        <div class="cp-emp-meta" id="cpm-meta"></div>
+      </div>
+    </div>
+    <div class="cp-stats-row">
+      <div class="cp-stat"><div class="cp-stat-num" style="color:var(--red)" id="cpm-s-crit">0</div><div class="cp-stat-label">Dias HE&gt;2h</div></div>
+      <div class="cp-stat"><div class="cp-stat-num" style="color:var(--yellow)" id="cpm-s-interv">0</div><div class="cp-stat-label">Intervalo irr.</div></div>
+      <div class="cp-stat"><div class="cp-stat-num" style="color:var(--orange)" id="cpm-s-marc">0</div><div class="cp-stat-label">Marcação irr.</div></div>
+      <div class="cp-stat"><div class="cp-stat-num" style="color:var(--text2)" id="cpm-s-falta">0</div><div class="cp-stat-label">Faltas/Atrasos</div></div>
+    </div>
+    <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Detalhe por Dia</div>
+    <div class="cp-day-grid" id="cpm-dias" style="max-height:340px;overflow-y:auto"></div>
+  </div>
 </div>
 
 <!-- UPLOAD SCREEN -->
@@ -1535,6 +1699,374 @@ function exportExcel() {
   XLSX.utils.book_append_sheet(wb, ws, 'Banco de Horas');
   const now = new Date();
   XLSX.writeFile(wb, `BancoHoras_${now.toLocaleDateString('pt-BR').replace(/\//g,'-')}.xlsx`);
+}
+
+// ══════════════════════════════════════════════
+//  TABS
+// ══════════════════════════════════════════════
+let activeTab = 'bh';
+function switchTab(tab) {
+  activeTab = tab;
+  document.getElementById('tab-btn-bh').classList.toggle('active', tab==='bh');
+  document.getElementById('tab-btn-cp').classList.toggle('active', tab==='cp');
+  // BH elements
+  const bhHasData = allData.length > 0;
+  document.getElementById('upload-screen').style.display = tab==='bh' && !bhHasData ? 'flex' : 'none';
+  document.getElementById('main-content').style.display = tab==='bh' && bhHasData ? 'block' : 'none';
+  document.getElementById('bh-warning').style.display = tab==='bh' ? '' : 'none';
+  document.getElementById('btn-presentation').style.display = tab==='bh' ? '' : 'none';
+  document.getElementById('btn-reset').style.display = tab==='bh' && bhHasData ? '' : 'none';
+  // CP elements
+  const cpHasData = cpAllData.length > 0;
+  document.getElementById('cp-upload-screen').style.display = tab==='cp' && !cpHasData ? 'flex' : 'none';
+  document.getElementById('cp-main').style.display = tab==='cp' && cpHasData ? 'block' : 'none';
+}
+
+// ══════════════════════════════════════════════
+//  CARTÃO DE PONTO — MATCHING
+// ══════════════════════════════════════════════
+const CP_CITY_MAP = [
+  {filial:3,  keys:['ARAGUAINA','ARAGUAÍNA']},
+  {filial:4,  keys:['RIO VERDE']},
+  {filial:5,  keys:['UBERLÂNDIA','UBERLANDIA']},
+  {filial:10, keys:['MARABÁ','MARABA']},
+  {filial:11, keys:['JATAÍ','JATAI']},
+  {filial:12, keys:['CRISTALINA']},
+  {filial:13, keys:['APARECIDA DE GOIANIA','APARECIDA DE GOIÂNIA']},
+  {filial:14, keys:['REDENÇÃO','REDENCAO']},
+  {filial:16, keys:['IMPERATRIZ']},
+  {filial:17, keys:['BARRA DO GARÇAS','BARRA DO GARCAS']},
+  {filial:19, keys:['PALMAS']},
+  {filial:21, keys:['MOZARLÂNDIA','MOZARLANDIA']},
+  {filial:22, keys:['PARAGOMINAS']},
+  {filial:23, keys:['SAO FELIX DO XINGU','SÃO FÉLIX DO XINGU','XINGUARA']},
+  {filial:24, keys:['FABRICA APARECIDA','FÁBRICA APARECIDA']},
+  {filial:25, keys:['CUIABÁ','CUIABA']},
+  {filial:27, keys:['URUAÇU','URUACU']},
+  {filial:28, keys:['MORRINHOS']},
+  {filial:29, keys:['CONFRESA']},
+  {filial:30, keys:['FORMOSA']},
+  {filial:31, keys:['JUSSARA']},
+  {filial:32, keys:['XINGUARA']},
+  {filial:34, keys:['PORANGATU']},
+  {filial:35, keys:['PONTES E LACERDA']},
+  {filial:36, keys:['GOIANIRA']},
+  {filial:37, keys:['CANARANA']},
+  {filial:38, keys:['GURUPI']},
+  {filial:40, keys:['RIALMA']},
+  {filial:41, keys:['ALTAMIRA']},
+];
+const CP_CNPJ_CACHE = {};
+
+function matchFilialCP(cnpj, endereco) {
+  if (CP_CNPJ_CACHE[cnpj]) return CP_CNPJ_CACHE[cnpj];
+  const e = (endereco||'').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+  for (const c of CP_CITY_MAP) {
+    for (const kw of c.keys) {
+      const kwn = kw.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+      if (e.includes(kwn)) {
+        const b = BASE_REGIONAIS.find(r => r.filial === c.filial) || null;
+        CP_CNPJ_CACHE[cnpj] = b;
+        return b;
+      }
+    }
+  }
+  CP_CNPJ_CACHE[cnpj] = null;
+  return null;
+}
+
+// ══════════════════════════════════════════════
+//  CARTÃO DE PONTO — PARSE
+// ══════════════════════════════════════════════
+let cpAllData = [];
+let cpFiltered = [];
+let cpKPIFilter = null;
+let cpSortCol = 2;
+let cpSortAsc = false;
+
+function handleCPFile(file) { if (file) parseCartaoPonto(file); }
+
+const cpDZ = document.getElementById('cp-drop-zone');
+cpDZ.addEventListener('dragover', e => { e.preventDefault(); cpDZ.classList.add('drag-over'); });
+cpDZ.addEventListener('dragleave', () => cpDZ.classList.remove('drag-over'));
+cpDZ.addEventListener('drop', e => { e.preventDefault(); cpDZ.classList.remove('drag-over'); if(e.dataTransfer.files[0]) handleCPFile(e.dataTransfer.files[0]); });
+
+function parseCartaoPonto(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+
+      // Col indices: 0=Empresa,1=Cnpj,2=Endereco,3=Colaborador,7=Cargo,17=Matricula
+      // 19=Dia,21=JornadaStr,22=EscalaStr,23=MarcacoesStr,25=Ocorrencia,26=Qtde
+      // 38=Data
+      const HE_RE    = /hora extra/i;
+      const INTERV_RE = /intervalo irr|hora extra intervalo|inconsist.*intervalo/i;
+      const MARC_RE  = /marcação irr|marcacao irr|hora extra irr/i;
+      const SEMMARK_RE = /sem marcação|sem marcacao/i;
+      const FALTA_RE = /^falta$/i;
+      const ATRASO_RE = /entrada em atraso/i;
+      const SAIDA_RE = /saída antecipada|saida antecipada/i;
+
+      const byDay = {};
+      let curColab='', curMat='', curCargo='', curCNPJ='', curEnd='', curData='', curDateObj=null;
+
+      for (let i = 1; i < rows.length; i++) {
+        const r = rows[i];
+        if (r[3]) { curColab=r[3]; curMat=String(r[17]||'').trim(); curCargo=String(r[7]||''); curCNPJ=String(r[1]||''); curEnd=String(r[2]||''); }
+        const rawDate = r[38];
+        if (rawDate) { curDateObj=rawDate; curData=rawDate instanceof Date ? rawDate.toISOString().slice(0,10) : String(rawDate).slice(0,10); }
+
+        const key = curMat + '||' + curData;
+        if (!byDay[key]) {
+          byDay[key] = { nome:curColab, matricula:curMat, cargo:curCargo, cnpj:curCNPJ, end:curEnd,
+            data:curData, dateObj:curDateObj, dia:'', jornada:'', marcacoes:'',
+            heMin:0, hasInterv:false, hasMarcIrr:false, hasSemMark:false,
+            hasFalta:false, hasAtraso:false, hasSaida:false, ocs:[] };
+        }
+        const d = byDay[key];
+        if (r[19]) { d.dia=String(r[19]); d.jornada=String(r[21]||''); d.marcacoes=String(r[23]||'').trim(); }
+
+        const oc = String(r[25]||'').trim();
+        const qt = String(r[26]||'00:00').trim();
+        if (oc && oc !== '0') {
+          d.ocs.push({tipo:oc, qtde:qt});
+          if (HE_RE.test(oc)) d.heMin += timeToMinutes(qt) || 0;
+          if (INTERV_RE.test(oc)) d.hasInterv = true;
+          if (MARC_RE.test(oc)) d.hasMarcIrr = true;
+          if (SEMMARK_RE.test(oc)) d.hasSemMark = true;
+          if (FALTA_RE.test(oc)) d.hasFalta = true;
+          if (ATRASO_RE.test(oc)) d.hasAtraso = true;
+          if (SAIDA_RE.test(oc)) d.hasSaida = true;
+        }
+      }
+
+      // Build employee summaries
+      const empMap = {};
+      for (const day of Object.values(byDay)) {
+        const k = day.matricula || day.nome;
+        if (!k) continue;
+        if (!empMap[k]) {
+          empMap[k] = {
+            nome:day.nome, matricula:day.matricula, cargo:day.cargo,
+            cnpj:day.cnpj, end:day.end, filial: matchFilialCP(day.cnpj, day.end),
+            diasHEcrit:0, diasHEatenc:0, diasInterv:0, diasMarcIrr:0,
+            diasSemMark:0, diasFalta:0, diasAtraso:0, maxHEmin:0,
+            dias:[]
+          };
+        }
+        const emp = empMap[k];
+        emp.dias.push(day);
+        if (day.heMin > 120) emp.diasHEcrit++;
+        else if (day.heMin > 60) emp.diasHEatenc++;
+        if (day.hasInterv) emp.diasInterv++;
+        if (day.hasMarcIrr) emp.diasMarcIrr++;
+        if (day.hasSemMark) emp.diasSemMark++;
+        if (day.hasFalta) emp.diasFalta++;
+        if (day.hasAtraso) emp.diasAtraso++;
+        if (day.heMin > emp.maxHEmin) emp.maxHEmin = day.heMin;
+      }
+
+      cpAllData = Object.values(empMap).filter(e =>
+        e.diasHEcrit + e.diasHEatenc + e.diasInterv + e.diasMarcIrr +
+        e.diasSemMark + e.diasFalta + e.diasAtraso > 0
+      ).sort((a,b)=> b.diasHEcrit - a.diasHEcrit);
+
+      showCPPanel();
+    } catch(err) { alert('Erro ao processar cartão de ponto: '+err.message); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ══════════════════════════════════════════════
+//  CARTÃO DE PONTO — UI
+// ══════════════════════════════════════════════
+function showCPPanel() {
+  switchTab('cp');
+  document.getElementById('cp-upload-screen').style.display = 'none';
+  document.getElementById('cp-main').style.display = 'block';
+  populateCPFilters();
+  applyCPFilters();
+  const badge = document.getElementById('tab-badge-cp');
+  badge.textContent = cpAllData.length;
+  badge.style.display = '';
+}
+
+function confirmResetCP() {
+  if (confirm('Limpar dados do Cartão de Ponto?')) {
+    cpAllData = []; cpFiltered = []; cpKPIFilter = null;
+    document.getElementById('tab-badge-cp').style.display='none';
+    switchTab('cp');
+  }
+}
+
+function populateCPFilters() {
+  const auditors = [...new Set(cpAllData.map(e=>e.filial?.auditor).filter(Boolean))].sort();
+  const filiais = [...new Set(cpAllData.map(e=> e.filial ? `F${String(e.filial.filial).padStart(2,'0')} ${e.filial.sigla}` : '—'))].sort();
+  fillSelect('cpf-auditor', auditors);
+  fillSelect('cpf-filial', filiais);
+}
+
+function filterCPByKPI(type) {
+  cpKPIFilter = cpKPIFilter === type ? null : type;
+  document.querySelectorAll('.cp-kpi-row .kpi-card').forEach(c=>c.classList.remove('selected'));
+  if (cpKPIFilter) document.getElementById('cpkpi-'+{he_crit:'crit',intervalo:'interv',marcacao:'marc',falta:'falta'}[cpKPIFilter]).classList.add('selected');
+  applyCPFilters();
+}
+
+function applyCPFilters() {
+  const reg = document.getElementById('cpf-regiao').value;
+  const aud = document.getElementById('cpf-auditor').value;
+  const fil = document.getElementById('cpf-filial').value;
+  const vio = document.getElementById('cpf-violacao').value || cpKPIFilter;
+
+  cpFiltered = cpAllData.filter(e => {
+    if (reg && e.filial?.regiao !== reg) return false;
+    if (aud && e.filial?.auditor !== aud) return false;
+    if (fil) {
+      const eFilStr = e.filial ? `F${String(e.filial.filial).padStart(2,'0')} ${e.filial.sigla}` : '—';
+      if (eFilStr !== fil) return false;
+    }
+    if (vio === 'he_crit' && !e.diasHEcrit) return false;
+    if (vio === 'he_atenc' && !e.diasHEatenc) return false;
+    if (vio === 'intervalo' && !e.diasInterv) return false;
+    if (vio === 'marcacao' && !e.diasMarcIrr) return false;
+    if (vio === 'sem_marcacao' && !e.diasSemMark) return false;
+    if (vio === 'falta' && !e.diasFalta) return false;
+    if (vio === 'atraso' && !e.diasAtraso) return false;
+    return true;
+  });
+
+  sortCPData();
+  updateCPKPIs();
+  renderCPTable();
+}
+
+function sortCPData() {
+  const cols = ['nome','filial_str','diasHEcrit','diasHEatenc','diasInterv','diasSemMark','diasFalta','maxHEmin'];
+  cpFiltered.sort((a,b)=>{
+    let va, vb;
+    if (cpSortCol===1) { va=(a.filial?.sigla||'zzz'); vb=(b.filial?.sigla||'zzz'); }
+    else { va=a[cols[cpSortCol]]; vb=b[cols[cpSortCol]]; }
+    if (typeof va==='string') va=va.toLowerCase();
+    if (typeof vb==='string') vb=vb.toLowerCase();
+    if (va<vb) return cpSortAsc?-1:1;
+    if (va>vb) return cpSortAsc?1:-1;
+    return 0;
+  });
+}
+
+function sortCPTable(col) {
+  if (cpSortCol===col) cpSortAsc=!cpSortAsc; else { cpSortCol=col; cpSortAsc=false; }
+  document.querySelectorAll('#cp-table th').forEach((th,i)=>{
+    th.classList.toggle('sorted',i===col);
+    const a=th.querySelector('.sort-arrow');
+    if(a) a.textContent=i===col?(cpSortAsc?'↑':'↓'):'↕';
+  });
+  sortCPData(); renderCPTable();
+}
+
+function updateCPKPIs() {
+  const uniq = arr => [...new Set(arr)].length;
+  document.getElementById('cpkv-crit').textContent  = cpFiltered.filter(e=>e.diasHEcrit>0).length;
+  document.getElementById('cpkv-interv').textContent = cpFiltered.filter(e=>e.diasInterv>0).length;
+  document.getElementById('cpkv-marc').textContent   = cpFiltered.filter(e=>e.diasMarcIrr+e.diasSemMark>0).length;
+  document.getElementById('cpkv-falta').textContent  = cpFiltered.filter(e=>e.diasFalta+e.diasAtraso>0).length;
+}
+
+function renderCPTable() {
+  const tbody = document.getElementById('cp-table-body');
+  document.getElementById('cp-table-count').textContent = cpFiltered.length + ' colaborador(es)';
+  if (!cpFiltered.length) {
+    tbody.innerHTML='<tr class="empty-row"><td colspan="9">Nenhum colaborador com irregularidades nos filtros selecionados.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = cpFiltered.map((e,i)=>{
+    const filStr = e.filial
+      ? `<strong>F${String(e.filial.filial).padStart(2,'0')} ${e.filial.sigla}</strong><br><small>${e.filial.auditor.split(' ')[0]}</small>`
+      : `<span class="filial-unknown">${e.cnpj.slice(-6)}</span>`;
+    const badges = [];
+    if(e.diasHEcrit)   badges.push(`<span class="vbadge vbadge-he-crit">🔴 ${e.diasHEcrit}d HE&gt;2h</span>`);
+    if(e.diasHEatenc)  badges.push(`<span class="vbadge vbadge-he-atenc">🟡 ${e.diasHEatenc}d HE 1-2h</span>`);
+    if(e.diasInterv)   badges.push(`<span class="vbadge vbadge-interval">🟠 ${e.diasInterv}d interv.</span>`);
+    if(e.diasMarcIrr)  badges.push(`<span class="vbadge vbadge-marcacao">🟣 ${e.diasMarcIrr}d marc.irr.</span>`);
+    if(e.diasSemMark)  badges.push(`<span class="vbadge vbadge-semmark">⚫ ${e.diasSemMark}d sem marc.</span>`);
+    if(e.diasFalta)    badges.push(`<span class="vbadge vbadge-falta">❌ ${e.diasFalta}d falta</span>`);
+    if(e.diasAtraso)   badges.push(`<span class="vbadge vbadge-atraso">⏰ ${e.diasAtraso}d atraso</span>`);
+    const rowClass = e.diasHEcrit ? 'row-red' : e.diasInterv||e.diasHEatenc ? 'row-yellow' : e.diasMarcIrr||e.diasSemMark ? 'row-green' : '';
+    const cargo = e.cargo.replace(/^\d+-/,'').trim();
+    return `<tr class="${rowClass}" onclick="openCPModal(${i})">
+      <td><strong>${e.nome}</strong><br><small>${cargo}</small></td>
+      <td>${filStr}</td>
+      <td style="color:var(--red);font-weight:800;font-size:16px">${e.diasHEcrit||'—'}</td>
+      <td style="color:var(--yellow);font-weight:700">${e.diasHEatenc||'—'}</td>
+      <td style="color:var(--orange);font-weight:700">${e.diasInterv||'—'}</td>
+      <td style="color:var(--text2)">${e.diasSemMark||'—'}</td>
+      <td style="color:var(--text2)">${e.diasFalta||'—'}</td>
+      <td style="font-weight:800">${e.maxHEmin>0?minutesToTime(e.maxHEmin):'—'}</td>
+      <td><div class="cp-violation-row">${badges.join('')}</div></td>
+    </tr>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════
+//  CARTÃO DE PONTO — MODAL DETALHE
+// ══════════════════════════════════════════════
+function openCPModal(idx) {
+  const e = cpFiltered[idx];
+  document.getElementById('cpm-nome').textContent = e.nome;
+  const cargo = e.cargo.replace(/^\d+-/,'').trim();
+  const filStr = e.filial ? `F${String(e.filial.filial).padStart(2,'0')} ${e.filial.sigla} · ${e.filial.auditor}` : e.cnpj;
+  document.getElementById('cpm-meta').textContent = `${cargo} · ${filStr}`;
+  document.getElementById('cpm-s-crit').textContent   = e.diasHEcrit;
+  document.getElementById('cpm-s-interv').textContent  = e.diasInterv;
+  document.getElementById('cpm-s-marc').textContent   = e.diasMarcIrr + e.diasSemMark;
+  document.getElementById('cpm-s-falta').textContent  = e.diasFalta + e.diasAtraso;
+
+  const diasOrdenados = [...e.dias].sort((a,b)=> a.data<b.data?-1:1);
+  document.getElementById('cpm-dias').innerHTML = diasOrdenados
+    .filter(d => d.heMin>0||d.hasInterv||d.hasMarcIrr||d.hasSemMark||d.hasFalta||d.hasAtraso)
+    .map(d => {
+      let rowClass = 'ok';
+      if (d.heMin > 120) rowClass = 'crit';
+      else if (d.heMin > 60 || d.hasInterv) rowClass = 'atenc';
+      else if (d.hasMarcIrr || d.hasSemMark) rowClass = 'interv';
+      const ocs = d.ocs.filter(o=>o.tipo!=='0').map(o=>`${o.tipo}: ${o.qtde}`).join(', ');
+      return `<div class="cp-day-row ${rowClass}">
+        <span style="font-weight:700">${d.dia||'—'} ${d.data.slice(8)}</span>
+        <span class="cp-day-marcacoes">${d.marcacoes||'—'}</span>
+        <span style="font-size:11px;color:var(--text2)">${ocs}</span>
+        <span class="cp-day-he" style="color:${d.heMin>120?'var(--red)':d.heMin>60?'var(--yellow)':'var(--text2)'}">
+          ${d.heMin>0?'HE '+minutesToTime(d.heMin):''}
+        </span>
+      </div>`;
+    }).join('') || '<div style="color:var(--text3);font-size:12px;padding:12px">Nenhuma irregularidade registrada pelo sistema.</div>';
+
+  document.getElementById('cp-modal-overlay').classList.add('open');
+}
+
+function closeCPModal(e) {
+  if (e && e.target !== document.getElementById('cp-modal-overlay')) return;
+  document.getElementById('cp-modal-overlay').classList.remove('open');
+}
+
+function exportCPExcel() {
+  const rows = [['Colaborador','Cargo','Filial','Sigla','Auditor','Região','Dias HE>2h','Dias HE 1-2h','Intervalo irr.','Marc. irr.','Sem marcação','Faltas','Atrasos','Max HE/dia']];
+  cpFiltered.forEach(e => {
+    rows.push([e.nome, e.cargo.replace(/^\d+-/,'').trim(),
+      e.filial?`F${String(e.filial.filial).padStart(2,'0')}`:'—',
+      e.filial?.sigla||'—', e.filial?.auditor||'—', e.filial?.regiao||'—',
+      e.diasHEcrit, e.diasHEatenc, e.diasInterv, e.diasMarcIrr,
+      e.diasSemMark, e.diasFalta, e.diasAtraso,
+      e.maxHEmin>0?minutesToTime(e.maxHEmin):'']);
+  });
+  const wb2 = XLSX.utils.book_new();
+  const ws2 = XLSX.utils.aoa_to_sheet(rows);
+  ws2['!cols'] = rows[0].map((_,i)=>({wch:[30,25,8,6,22,8,10,10,10,10,10,8,8,10][i]||12}));
+  XLSX.utils.book_append_sheet(wb2, ws2, 'Marcações Irregulares');
+  XLSX.writeFile(wb2, `MarcacoesIrregulares_${new Date().toLocaleDateString('pt-BR').replace(/\//g,'-')}.xlsx`);
 }
 
 // ══════════════════════════════════════════════
