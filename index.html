@@ -1945,6 +1945,7 @@ function parseCartaoPonto(file) {
       }
 
       cpAllData = Object.values(empMap).filter(e =>
+        !/estagiário|estagiario/i.test(e.cargo) &&
         e.diasHEcrit + e.diasHEatenc + e.diasInterv + e.diasMarcIrr +
         e.diasSemMark + e.diasFalta + e.diasAtraso > 0
       ).sort((a,b)=> b.diasHEcrit - a.diasHEcrit);
