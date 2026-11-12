@@ -1889,7 +1889,7 @@ function parseCartaoPonto(file) {
   const reader = new FileReader();
   reader.onload = (e) => {
     try {
-      const wb = XLSX.read(e.target.result, {type:'array'});
+      const wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
 
@@ -1911,7 +1911,13 @@ function parseCartaoPonto(file) {
         const r = rows[i];
         if (r[3]) { curColab=r[3]; curMat=String(r[17]||'').trim(); curCargo=String(r[7]||''); curCNPJ=String(r[1]||''); curEnd=String(r[2]||''); }
         const rawDate = r[38];
-        if (rawDate) { curDateObj=rawDate; curData=rawDate instanceof Date ? rawDate.toISOString().slice(0,10) : String(rawDate).slice(0,10); }
+        if (rawDate) {
+          curDateObj = rawDate;
+          if (rawDate instanceof Date) {
+            const y=rawDate.getFullYear(), m=String(rawDate.getMonth()+1).padStart(2,'0'), d2=String(rawDate.getDate()).padStart(2,'0');
+            curData = `${y}-${m}-${d2}`;
+          } else { curData = String(rawDate).slice(0,10); }
+        }
 
         const key = curMat + '||' + curData;
         if (!byDay[key]) {
