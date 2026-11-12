@@ -2162,7 +2162,7 @@ function renderCPTable() {
     const aud = e.filial?.auditor || '— Sem auditor';
     if (aud !== curAuditor) {
       curAuditor = aud;
-      const grpEmps = sorted.filter(x=>(x.filial?.auditor||'— Sem auditor')===aud);
+      const grpEmps = toRender.filter(x=>(x.filial?.auditor||'— Sem auditor')===aud);
       const grpCrit = grpEmps.filter(x=>x.diasHEcrit>0).length;
       const grpInterv = grpEmps.filter(x=>x.diasInterv>0).length;
       const grpFalta = grpEmps.filter(x=>x.diasFalta+x.diasAtraso>0).length;
