@@ -697,6 +697,9 @@ body:not(.presentation) .ps-shortcut-bar { display: none; }
     <span class="filter-label">Filial</span>
     <select class="filter-select" id="cpf-filial" onchange="applyCPFilters()"></select>
     <div class="filter-sep"></div>
+    <span class="filter-label">Cargo</span>
+    <select class="filter-select" id="cpf-cargo" onchange="applyCPFilters()"></select>
+    <div class="filter-sep"></div>
     <span class="filter-label">Violação</span>
     <select class="filter-select" id="cpf-violacao" onchange="applyCPFilters()">
       <option value="">Todas</option>
@@ -1994,15 +1997,19 @@ function cpSubset(reg, aud) {
   });
 }
 
+function cpFilStr(e) {
+  return e.filial&&e.filial.sigla!=='ADM' ? `F${String(e.filial.filial).padStart(2,'0')} ${e.filial.sigla}` : null;
+}
+function cpCargoClean(e) { return e.cargo.replace(/^\d+-/,'').trim(); }
+
 function onCPRegiaoChange() {
   const reg = document.getElementById('cpf-regiao').value;
   const sub = cpSubset(reg, '');
   fillSelectPreserve('cpf-auditor', [...new Set(sub.map(e=>e.filial?.auditor).filter(Boolean))].sort());
   const aud = document.getElementById('cpf-auditor').value;
   const sub2 = cpSubset(reg, aud);
-  fillSelectPreserve('cpf-filial', [...new Set(sub2.map(e=>
-    e.filial&&e.filial.sigla!=='ADM' ? `F${String(e.filial.filial).padStart(2,'0')} ${e.filial.sigla}` : null
-  ).filter(Boolean))].sort());
+  fillSelectPreserve('cpf-filial', [...new Set(sub2.map(cpFilStr).filter(Boolean))].sort());
+  fillSelectPreserve('cpf-cargo', [...new Set(sub2.map(cpCargoClean).filter(Boolean))].sort());
   applyCPFilters();
 }
 
@@ -2010,9 +2017,8 @@ function onCPAuditorChange() {
   const reg = document.getElementById('cpf-regiao').value;
   const aud = document.getElementById('cpf-auditor').value;
   const sub = cpSubset(reg, aud);
-  fillSelectPreserve('cpf-filial', [...new Set(sub.map(e=>
-    e.filial&&e.filial.sigla!=='ADM' ? `F${String(e.filial.filial).padStart(2,'0')} ${e.filial.sigla}` : null
-  ).filter(Boolean))].sort());
+  fillSelectPreserve('cpf-filial', [...new Set(sub.map(cpFilStr).filter(Boolean))].sort());
+  fillSelectPreserve('cpf-cargo', [...new Set(sub.map(cpCargoClean).filter(Boolean))].sort());
   applyCPFilters();
 }
 
@@ -2044,6 +2050,7 @@ function applyCPFilters() {
   const reg = document.getElementById('cpf-regiao').value;
   const aud = document.getElementById('cpf-auditor').value;
   const fil = document.getElementById('cpf-filial').value;
+  const car = document.getElementById('cpf-cargo').value;
   const vio = document.getElementById('cpf-violacao').value || cpKPIFilter;
 
   cpFiltered = cpAllData.filter(e => {
@@ -2053,6 +2060,7 @@ function applyCPFilters() {
       const eFilStr = e.filial ? `F${String(e.filial.filial).padStart(2,'0')} ${e.filial.sigla}` : '—';
       if (eFilStr !== fil) return false;
     }
+    if (car && cpCargoClean(e) !== car) return false;
     if (vio === 'he_crit' && !e.diasHEcrit) return false;
     if (vio === 'he_atenc' && !e.diasHEatenc) return false;
     if (vio === 'intervalo' && !e.diasInterv) return false;
