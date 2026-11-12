@@ -515,6 +515,11 @@ textarea:focus { border-color: var(--accent); }
 .cp-stat { background: var(--surface2); border-radius: 8px; padding: 10px; text-align: center; border: 1px solid var(--border); }
 .cp-stat-num { font-size: 24px; font-weight: 900; }
 .cp-stat-label { font-size: 10px; color: var(--text2); font-weight: 600; margin-top: 2px; }
+.cp-stat-clickable { cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+.cp-stat-clickable:hover { border-color: var(--blue); box-shadow: 0 0 0 2px rgba(37,99,235,.12); }
+.cp-stat-clickable.active { border-color: var(--blue); box-shadow: 0 0 0 2px rgba(37,99,235,.18); background: var(--surface); }
+.cpm-filter-hint { font-size: 10px; color: var(--blue); font-weight: 600; margin-top: 2px; display: none; }
+.cp-stat-clickable.active .cpm-filter-hint { display: block; }
 .filial-unknown { font-size: 10px; color: var(--text3); font-style: italic; }
 @media (max-width: 700px) { .cp-kpi-row { grid-template-columns: repeat(2,1fr); } .cp-day-row { grid-template-columns: 50px 1fr; } }
 
@@ -778,12 +783,12 @@ body:not(.presentation) .ps-shortcut-bar { display: none; }
       </div>
     </div>
     <div class="cp-stats-row">
-      <div class="cp-stat"><div class="cp-stat-num" style="color:var(--red)" id="cpm-s-crit">0</div><div class="cp-stat-label">Dias HE&gt;2h</div></div>
-      <div class="cp-stat"><div class="cp-stat-num" style="color:var(--yellow)" id="cpm-s-interv">0</div><div class="cp-stat-label">Intervalo irr.</div></div>
-      <div class="cp-stat"><div class="cp-stat-num" style="color:var(--orange)" id="cpm-s-marc">0</div><div class="cp-stat-label">Marcação irr.</div></div>
-      <div class="cp-stat"><div class="cp-stat-num" style="color:var(--text2)" id="cpm-s-falta">0</div><div class="cp-stat-label">Faltas/Atrasos</div></div>
+      <div class="cp-stat cp-stat-clickable" id="cpms-he" onclick="toggleCPModalFilter('he_crit')"><div class="cp-stat-num" style="color:var(--red)" id="cpm-s-crit">0</div><div class="cp-stat-label">Dias HE&gt;2h</div><div class="cpm-filter-hint">filtrado</div></div>
+      <div class="cp-stat cp-stat-clickable" id="cpms-interv" onclick="toggleCPModalFilter('intervalo')"><div class="cp-stat-num" style="color:var(--yellow)" id="cpm-s-interv">0</div><div class="cp-stat-label">Intervalo irr.</div><div class="cpm-filter-hint">filtrado</div></div>
+      <div class="cp-stat cp-stat-clickable" id="cpms-marc" onclick="toggleCPModalFilter('marcacao')"><div class="cp-stat-num" style="color:var(--orange)" id="cpm-s-marc">0</div><div class="cp-stat-label">Marcação irr.</div><div class="cpm-filter-hint">filtrado</div></div>
+      <div class="cp-stat cp-stat-clickable" id="cpms-falta" onclick="toggleCPModalFilter('falta')"><div class="cp-stat-num" style="color:var(--text2)" id="cpm-s-falta">0</div><div class="cp-stat-label">Faltas/Atrasos</div><div class="cpm-filter-hint">filtrado</div></div>
     </div>
-    <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Detalhe por Dia</div>
+    <div id="cpm-day-title" style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Detalhe por Dia</div>
     <div class="cp-day-grid" id="cpm-dias" style="max-height:340px;overflow-y:auto"></div>
   </div>
 </div>
@@ -1868,6 +1873,8 @@ function matchFilialCP(cnpj) {
 let cpAllData = [];
 let cpFiltered = [];
 let cpKPIFilter = null;
+let cpModalFilter = null;
+let cpModalEmp = null;
 let cpSortCol = 2;
 let cpSortAsc = false;
 
@@ -2088,9 +2095,18 @@ function applyCPFilters() {
 function sortCPData() {
   const cols = ['nome','filial_str','diasHEcrit','diasHEatenc','diasInterv','diasSemMark','diasFalta','maxHEmin'];
   cpFiltered.sort((a,b)=>{
-    let va, vb;
-    if (cpSortCol===1) { va=(a.filial?.sigla||'zzz'); vb=(b.filial?.sigla||'zzz'); }
-    else { va=a[cols[cpSortCol]]; vb=b[cols[cpSortCol]]; }
+    // Always group by auditor first
+    const aa = (a.filial?.auditor||'zzz').toLowerCase();
+    const ba = (b.filial?.auditor||'zzz').toLowerCase();
+    if(aa<ba) return -1; if(aa>ba) return 1;
+    // Secondary: filial sigla when sorting by filial/auditor col
+    if (cpSortCol===1) {
+      const af=(a.filial?.sigla||'zzz').toLowerCase(), bf=(b.filial?.sigla||'zzz').toLowerCase();
+      if(af<bf) return cpSortAsc?-1:1; if(af>bf) return cpSortAsc?1:-1;
+      return b.diasHEcrit - a.diasHEcrit;
+    }
+    // User-chosen column
+    let va=a[cols[cpSortCol]], vb=b[cols[cpSortCol]];
     if (typeof va==='string') va=va.toLowerCase();
     if (typeof vb==='string') vb=vb.toLowerCase();
     if (va<vb) return cpSortAsc?-1:1;
@@ -2132,26 +2148,17 @@ function renderCPTable() {
   document.getElementById('cp-table-count').textContent =
     normais.length + ' colaborador(es)' + (porteiros.length && !showPorteiros ? ` (+${porteiros.length} porteiro(s) oculto(s))` : '');
 
-  // Sort: auditor → filial → HE crit desc
-  const sorted = [...toRender].sort((a,b)=>{
-    const aa = a.filial?.auditor||'zzz', ba = b.filial?.auditor||'zzz';
-    if(aa<ba) return -1; if(aa>ba) return 1;
-    const af = a.filial?.sigla||'zzz', bf = b.filial?.sigla||'zzz';
-    if(af<bf) return -1; if(af>bf) return 1;
-    return b.diasHEcrit - a.diasHEcrit;
-  });
-
-  if (!sorted.length) {
+  if (!toRender.length) {
     tbody.innerHTML='<tr class="empty-row"><td colspan="9">Nenhuma ocorrência nos filtros selecionados.</td></tr>';
     return;
   }
-  // Update cpFiltered to match sorted order so modal indices stay consistent
-  cpFiltered.length = 0; sorted.forEach(e=>cpFiltered.push(e));
+  // cpFiltered already sorted by sortCPData; rebuild to match toRender order
+  cpFiltered.length = 0; toRender.forEach(e=>cpFiltered.push(e));
 
   let html = '';
   let curAuditor = null;
 
-  sorted.forEach((e, i) => {
+  toRender.forEach((e, i) => {
     const aud = e.filial?.auditor || '— Sem auditor';
     if (aud !== curAuditor) {
       curAuditor = aud;
@@ -2164,9 +2171,9 @@ function renderCPTable() {
           <div style="display:flex;align-items:center;gap:16px">
             <span style="font-size:14px;font-weight:800">${aud}</span>
             <span style="font-size:11px;color:var(--text2)">${grpEmps.length} colaborador(es)</span>
-            ${grpCrit?`<span class="vbadge vbadge-he-crit" style="font-size:11px">🔴 ${grpCrit} HE crítico</span>`:''}
-            ${grpInterv?`<span class="vbadge vbadge-interval" style="font-size:11px">🟠 ${grpInterv} intervalo</span>`:''}
-            ${grpFalta?`<span class="vbadge vbadge-falta" style="font-size:11px">❌ ${grpFalta} falta/atraso</span>`:''}
+            ${grpCrit?`<span class="vbadge vbadge-he-crit" style="font-size:11px">${grpCrit} HE</span>`:''}
+            ${grpInterv?`<span class="vbadge vbadge-interval" style="font-size:11px">${grpInterv} IR</span>`:''}
+            ${grpFalta?`<span class="vbadge vbadge-falta" style="font-size:11px">${grpFalta} F/Atr</span>`:''}
           </div>
         </td>
       </tr>`;
@@ -2176,12 +2183,12 @@ function renderCPTable() {
       ? `<strong>F${String(e.filial.filial).padStart(2,'0')} ${e.filial.sigla}</strong>`
       : `<span class="filial-unknown">${(e.cnpj||'').replace(/\D/g,'').slice(10,14)}</span>`;
     const badges = [];
-    if(e.diasHEcrit)  badges.push(`<span class="vbadge vbadge-he-crit">🔴 ${e.diasHEcrit}d&gt;2h</span>`);
-    if(e.diasHEatenc) badges.push(`<span class="vbadge vbadge-he-atenc">🟡 ${e.diasHEatenc}d&gt;1h</span>`);
-    if(e.diasInterv)  badges.push(`<span class="vbadge vbadge-interval">🟠 ${e.diasInterv}d interv.</span>`);
-    if(e.diasMarcIrr||e.diasSemMark) badges.push(`<span class="vbadge vbadge-marcacao">🟣 ${e.diasMarcIrr+e.diasSemMark}d marc.</span>`);
-    if(e.diasFalta)   badges.push(`<span class="vbadge vbadge-falta">❌ ${e.diasFalta}d falta</span>`);
-    if(e.diasAtraso)  badges.push(`<span class="vbadge vbadge-atraso">⏰ ${e.diasAtraso}d atraso</span>`);
+    if(e.diasHEcrit)  badges.push(`<span class="vbadge vbadge-he-crit">${e.diasHEcrit}d HE</span>`);
+    if(e.diasHEatenc) badges.push(`<span class="vbadge vbadge-he-atenc">${e.diasHEatenc}d HE</span>`);
+    if(e.diasInterv)  badges.push(`<span class="vbadge vbadge-interval">${e.diasInterv}d IR</span>`);
+    if(e.diasMarcIrr||e.diasSemMark) badges.push(`<span class="vbadge vbadge-marcacao">${e.diasMarcIrr+e.diasSemMark}d MI</span>`);
+    if(e.diasFalta)   badges.push(`<span class="vbadge vbadge-falta">${e.diasFalta}d F</span>`);
+    if(e.diasAtraso)  badges.push(`<span class="vbadge vbadge-atraso">${e.diasAtraso}d Atr</span>`);
     const rowClass = isPorteiro(e) ? 'row-porteiro' : e.diasHEcrit ? 'row-red' : e.diasInterv||e.diasHEatenc ? 'row-yellow' : '';
     const cargo = e.cargo.replace(/^\d+-/,'').trim();
     html += `<tr class="${rowClass}" onclick="openCPModal(${i})">
@@ -2202,27 +2209,26 @@ function renderCPTable() {
 // ══════════════════════════════════════════════
 //  CARTÃO DE PONTO — MODAL DETALHE
 // ══════════════════════════════════════════════
-function openCPModal(idx) {
-  const e = cpFiltered[idx];
-  document.getElementById('cpm-nome').textContent = e.nome;
-  const cargo = e.cargo.replace(/^\d+-/,'').trim();
-  const filStr = e.filial ? `F${String(e.filial.filial).padStart(2,'0')} ${e.filial.sigla} · ${e.filial.auditor}` : e.cnpj;
-  document.getElementById('cpm-meta').textContent = `${cargo} · ${filStr}`;
-  document.getElementById('cpm-s-crit').textContent   = e.diasHEcrit;
-  document.getElementById('cpm-s-interv').textContent  = e.diasInterv;
-  document.getElementById('cpm-s-marc').textContent   = e.diasMarcIrr + e.diasSemMark;
-  document.getElementById('cpm-s-falta').textContent  = e.diasFalta + e.diasAtraso;
+function renderCPModalDays() {
+  const e = cpModalEmp;
+  const activeFilter = cpModalFilter || cpKPIFilter;
+  const filterLabels = {he_crit:'HE > 2h/dia',he_atenc:'HE 1-2h/dia',intervalo:'Intervalo irr.',marcacao:'Marcação irr.',falta:'Faltas/Atrasos'};
+  document.getElementById('cpm-day-title').textContent =
+    activeFilter ? `Detalhe por Dia — ${filterLabels[activeFilter]}` : 'Detalhe por Dia';
+
+  // Highlight active modal card
+  const cardMap = {he_crit:'cpms-he', intervalo:'cpms-interv', marcacao:'cpms-marc', falta:'cpms-falta'};
+  Object.entries(cardMap).forEach(([k,id])=>{
+    document.getElementById(id).classList.toggle('active', cpModalFilter===k);
+  });
 
   const diasOrdenados = [...e.dias].sort((a,b)=> a.data<b.data?-1:1);
-  const kpiFilterLabel = {he_crit:'HE > 2h/dia',he_atenc:'HE 1-2h/dia',intervalo:'Intervalo irregular',marcacao:'Marcação irregular',falta:'Faltas e atrasos'}[cpKPIFilter];
-  document.getElementById('cpm-dias').previousElementSibling.textContent =
-    kpiFilterLabel ? `Detalhe por Dia — ${kpiFilterLabel}` : 'Detalhe por Dia';
   let diasBase = diasOrdenados.filter(d => d.heMin>0||d.hasInterv||d.hasMarcIrr||d.hasSemMark||d.hasFalta||d.hasAtraso);
-  if (cpKPIFilter==='he_crit')    diasBase = diasBase.filter(d=>d.heMin>120);
-  else if (cpKPIFilter==='he_atenc')  diasBase = diasBase.filter(d=>d.heMin>60&&d.heMin<=120);
-  else if (cpKPIFilter==='intervalo') diasBase = diasBase.filter(d=>d.hasInterv);
-  else if (cpKPIFilter==='marcacao')  diasBase = diasBase.filter(d=>d.hasMarcIrr||d.hasSemMark);
-  else if (cpKPIFilter==='falta')     diasBase = diasBase.filter(d=>d.hasFalta||d.hasAtraso);
+  if (activeFilter==='he_crit')    diasBase = diasBase.filter(d=>d.heMin>120);
+  else if (activeFilter==='he_atenc')  diasBase = diasBase.filter(d=>d.heMin>60&&d.heMin<=120);
+  else if (activeFilter==='intervalo') diasBase = diasBase.filter(d=>d.hasInterv);
+  else if (activeFilter==='marcacao')  diasBase = diasBase.filter(d=>d.hasMarcIrr||d.hasSemMark);
+  else if (activeFilter==='falta')     diasBase = diasBase.filter(d=>d.hasFalta||d.hasAtraso);
   document.getElementById('cpm-dias').innerHTML = diasBase
     .map(d => {
       let rowClass = 'ok';
@@ -2239,7 +2245,26 @@ function openCPModal(idx) {
         </span>
       </div>`;
     }).join('') || '<div style="color:var(--text3);font-size:12px;padding:12px">Nenhuma irregularidade registrada pelo sistema.</div>';
+}
 
+function toggleCPModalFilter(type) {
+  cpModalFilter = cpModalFilter === type ? null : type;
+  renderCPModalDays();
+}
+
+function openCPModal(idx) {
+  const e = cpFiltered[idx];
+  cpModalEmp = e;
+  cpModalFilter = null;
+  document.getElementById('cpm-nome').textContent = e.nome;
+  const cargo = e.cargo.replace(/^\d+-/,'').trim();
+  const filStr = e.filial ? `F${String(e.filial.filial).padStart(2,'0')} ${e.filial.sigla} · ${e.filial.auditor}` : e.cnpj;
+  document.getElementById('cpm-meta').textContent = `${cargo} · ${filStr}`;
+  document.getElementById('cpm-s-crit').textContent   = e.diasHEcrit;
+  document.getElementById('cpm-s-interv').textContent  = e.diasInterv;
+  document.getElementById('cpm-s-marc').textContent   = e.diasMarcIrr + e.diasSemMark;
+  document.getElementById('cpm-s-falta').textContent  = e.diasFalta + e.diasAtraso;
+  renderCPModalDays();
   document.getElementById('cp-modal-overlay').classList.add('open');
 }
 
