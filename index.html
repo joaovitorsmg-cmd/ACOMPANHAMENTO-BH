@@ -1374,7 +1374,16 @@ function parseXLSX(file) {
         if (!r[6]) continue; // sem nome
         
         const estab = String(r[2]||'').trim();
-        const matched = normEstab(estab);
+        const depto = String(r[3]||'').trim();
+        // extract filial from Departamento (e.g. "75 - F01 EQUIPE ADMINISTRATIVA")
+        let matched = null;
+        const deptoMatch = depto.match(/\bF(\d{2})\b/);
+        if (deptoMatch) {
+          const filNum = parseInt(deptoMatch[1], 10);
+          const b = BASE_REGIONAIS.find(x=>x.filial===filNum);
+          if (b) matched = {filial:b.filial, sigla:b.sigla, regiao:b.regiao, auditor:b.auditor, supervisor:b.supervisor, gerente:b.gerente};
+        }
+        if (!matched) matched = normEstab(estab);
         // get full regional info if filial matched
         let regional = null;
         if (matched.filial) {
